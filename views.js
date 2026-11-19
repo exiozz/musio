@@ -314,9 +314,10 @@ function chatListHTML() {
   const ks = allComms().filter(k => !q || k.name.toLowerCase().includes(q));
   const create = `<button class="imp-card glass strong" data-a="newComm">${ic('plus', 22)}<span class="grow tt"><b>Créer une communauté</b><small>Autour d’un genre, d’un artiste, d’une ville…</small></span>${ic('chevron', 20)}</button>`;
   if (!ks.length) return create + `<div class="empty">${ic('users', 36)}<span>${q ? 'Aucune communauté pour « ' + esc(U.chatQ) + ' ».' : window.CLOUD_COMMS === undefined || window.CLOUD_COMMS ? 'Aucune communauté pour l’instant. Crée la première !' : 'Chargement…'}</span></div>`;
-  const joined = ks.filter(k => k.joined), other = ks.filter(k => !k.joined);
+  const bs = (arr) => typeof boostSort === 'function' ? boostSort(arr, 'community') : arr, bb = id => typeof boostBadge === 'function' ? boostBadge('community', id) : '';
+  const joined = bs(ks.filter(k => k.joined)), other = bs(ks.filter(k => !k.joined));
   return `${create}${joined.length ? `<p class="result-h">Tes communautés</p><div class="panel glass"><div class="list">${joined.map(k => { const lp = k.posts[k.posts.length - 1]; return `<button class="conv" data-a="openCommunity" data-id="${k.id}">${cover(k, 52, 18)}<span class="grow"><b>${esc(k.name)}</b><small>${lp ? esc((lp.me ? 'Toi' : lp.user) + ' : ' + (lp.text || 'a partagé un son')) : ''}</small></span><span class="meta">${fmtN(k.members)}</span></button>`; }).join('')}</div></div>` : ''}
-    ${other.length ? `<p class="result-h">À découvrir</p><div class="ccards">${other.map(k => `<div class="ccard glass"><button class="ccard-main" data-a="openCommunity" data-id="${k.id}">${cover(k, 300, 22)}<b>${esc(k.name)}</b><small>${fmtN(k.members)} membre${k.members > 1 ? 's' : ''}</small></button><button class="btn primary" style="height:38px" data-a="join" data-id="${k.id}">Rejoindre</button></div>`).join('')}</div>` : ''}`;
+    ${other.length ? `<p class="result-h">À découvrir</p><div class="ccards">${other.map(k => `<div class="ccard glass"><button class="ccard-main" data-a="openCommunity" data-id="${k.id}">${cover(k, 300, 22)}<b>${esc(k.name)}</b>${bb(k.id)}<small>${fmtN(k.members)} membre${k.members > 1 ? 's' : ''}</small></button><button class="btn primary" style="height:38px" data-a="join" data-id="${k.id}">Rejoindre</button></div>`).join('')}</div>` : ''}`;
 }
 VIEWS.chat = () => {
   const live = FRIENDS.filter(f => f.live && !blocked(f.id));

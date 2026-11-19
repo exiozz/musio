@@ -309,7 +309,7 @@ function accountGroupHTML() {
   return `<p class="group-t">Compte</p><div class="group glass">
     <div class="srow"><span class="row" style="gap:12px">${sicon('mail')}<span class="grow tt"><span>E-mail</span><small>${esc(email)}</small></span></span></div>
     ${navRow('Changer le mot de passe', 'authChangePass', 'lock')}
-    ${isCreator() ? navRow('Créateurs de Musio', 'openCreators', 'sparkle', 'Donner ou retirer le rôle créateur') : ''}
+    ${isCreator() ? navRow('Panel admin', 'openAdmin', 'shield', 'Statistiques, comptes, signalements, boosts') + navRow('Créateurs de Musio', 'openCreators', 'sparkle', 'Donner ou retirer le rôle créateur') : ''}
     <button class="srow" data-a="authLogout">${ic('logout', 20)}<span class="grow">Se déconnecter</span></button></div>`;
 }
 A.authChangePass = () => push('authNewPass', { change: true });
@@ -319,6 +319,7 @@ A.authLogout = () => { U.dialogFn = async () => { await SB.auth.signOut().catch(
 async function bootAccounts() {
   if (!SB) { if (!S.onboarded) startOnboarding(); return; }
   if (typeof bootCloud === 'function') bootCloud();
+  if (typeof bootAdmin === 'function') bootAdmin();
 
   // cocher une case ne doit pas effacer l'e-mail et le mot de passe saisis
   const baseCheck = A.obCheck;

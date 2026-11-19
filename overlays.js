@@ -105,6 +105,8 @@ OV.playerMore = {
       <button class="li" data-a="openArtist" data-id="${esc(t.artist)}">${ic('user', 22)}<span class="grow">Voir l’artiste</span></button>
       <button class="li" data-a="sleep">${ic('moon', 22)}<span class="grow">Minuterie de sommeil${left ? `<small class="t2" style="display:block">${left}</small>` : ''}</span></button>
       <button class="li" data-a="queue">${ic('queue', 22)}<span class="grow">File d’attente</span></button>
+      ${window.MUSIO_CLOUD && (t.cloud || t.cloudId) ? `<button class="li" data-a="copySoundLink" data-id="${t.id}">${ic('link', 22)}<span class="grow">Copier le lien du son</span></button>` : ''}
+      ${t.cloud && window.MUSIO_CLOUD && t.ownerId !== S.uid ? `<button class="li danger" data-a="report" data-k="track" data-id="${t.id}">${ic('flag', 22)}<span class="grow">Signaler ce son</span></button>` : ''}
       ${t.cloud && window.MUSIO_CLOUD && (isCreator() || t.ownerId === S.uid) ? `<button class="li danger" data-a="unpublishCloud" data-id="${t.id}">${ic('trash', 22)}<span class="grow">Retirer ce son de Musio${t.ownerId === S.uid ? '' : '<small class="t2" style="display:block">Modération</small>'}</span></button>` : ''}</div>`; },
 };
 OV.sleep = {
@@ -157,7 +159,7 @@ OV.more = {
         <button class="li danger" data-a="block" data-id="${u.id}">${ic('block', 22)}<span class="grow">Bloquer ${esc(u.name)}</span></button>
         <button class="li danger" data-a="deleteConv" data-id="${c.id}">${ic('trash', 22)}<span class="grow">Supprimer la conversation</span></button></div>`; }
     if (o.k === 'comm') { const k = comm(o.id);
-      return `<div class="list"><button class="li" data-a="legal" data-id="community">${ic('users', 22)}<span class="grow">Règles de la communauté</span></button>
+      return `<div class="list">${k.cloud ? `<button class="li" data-a="copyCommLink" data-id="${k.id}">${ic('link', 22)}<span class="grow">Copier le lien de la communauté</span></button>` : ''}<button class="li" data-a="legal" data-id="community">${ic('users', 22)}<span class="grow">Règles de la communauté</span></button>
         <button class="li danger" data-a="report" data-k="comm" data-id="${k.id}">${ic('flag', 22)}<span class="grow">Signaler la communauté</span></button>
         ${k.joined && !k.mine ? `<button class="li danger" data-a="join" data-id="${k.id}">${ic('close', 22)}<span class="grow">Quitter ${esc(k.name)}</span></button>` : ''}
         ${k.mine || (window.MUSIO_CLOUD && isCreator()) ? `<button class="li danger" data-a="deleteComm" data-id="${k.id}">${ic('trash', 22)}<span class="grow">Supprimer la communauté</span></button>` : ''}</div>`; }

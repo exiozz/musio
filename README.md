@@ -18,6 +18,8 @@ Musio est une application web installable (PWA) : elle s'ajoute à l'écran d'ac
 - Anti-robots Cloudflare Turnstile et « Continuer avec Apple / Google » (affichés dès qu'ils sont activés)
 - Communautés en ligne : création, découverte, rejoindre/quitter, messages en direct, modération par le fondateur
 - Publication de sons : tes sons importés peuvent être mis en ligne et écoutés par tous (Supabase Storage)
+- Panel admin (créateurs) : statistiques, comptes (rôle, suspension), signalements, modération, boosts
+- Liens partageables pour les sons et les communautés (`#son-…`, `#commu-…`)
 - Vraie carte (MapLibre + OpenFreeMap, gratuite et sans clé) avec ta position arrondie au quartier
 - Rôle « Créateur de Musio » : badge sur le profil, attribué ou retiré par un autre créateur (Réglages › Créateurs de Musio)
 - Lecteur complet : file d'attente, aléatoire, répétition, paroles, minuterie de sommeil, fond aux couleurs de la pochette
@@ -45,6 +47,7 @@ Le schéma de la base est dans `supabase/migrations/` (comptes, communautés, so
 - `delete_my_account` supprime le compte et le profil
 - `communities`, `community_members`, `community_posts` : 10 communautés max par personne, il faut être membre pour écrire
 - `tracks` + buckets `sounds` / `covers` : chacun dépose ses fichiers dans son dossier, 20 Mo et 100 sons max par compte, droits certifiés
+- `reports`, `boosts`, `admin_stats`, `admin_ban` (005) : signalements en ligne, mise en avant pendant une durée, suspension de comptes
 
 Vide `config.js` pour faire tourner Musio sans comptes en ligne (mode local).
 
@@ -57,6 +60,7 @@ Vide `config.js` pour faire tourner Musio sans comptes en ligne (mode local).
 | `views.js` / `overlays.js` | écrans et fenêtres |
 | `actions.js` | interactions |
 | `cloud.js` | communautés et sons en ligne |
+| `admin.js` | panel admin, boosts, liens partageables |
 | `auth.js` / `config.js` | comptes en ligne (Supabase), anti-robots, Apple / Google |
 | `vendor/maplibre/` | moteur de carte (MapLibre GL, licence BSD) |
 | `audio.js` | moteur audio (Web Audio API) |

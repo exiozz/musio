@@ -910,3 +910,20 @@ button.imp-card{width:100%;text-align:left}
 .shapes button.on{box-shadow:0 0 0 2px var(--accent)}
 .pub-note{font-size:12px;line-height:1.45;color:var(--t3,#8E8E93)}
 .cloud-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.3px}
+
+/* panel admin et boosts */
+.boost-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#D9B8FF;background:rgba(191,90,242,.18);padding:3px 8px;border-radius:999px;vertical-align:middle;white-space:nowrap}
+.ccard .boost-tag{align-self:flex-start;margin-top:2px}
+.adm .seg{margin-bottom:4px}
+.adm-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+.adm-cards .warn b{color:#FF9F0A}
+.adm-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:10px}
+.adm-bar i{display:block;height:100%;background:var(--accent);border-radius:inherit}
+.adm-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(61,139,255,.2);color:#9CC3FF;vertical-align:middle}
+.adm-tag.red{background:rgba(255,69,58,.2);color:#FF8A94}
+.adm-rep{align-items:flex-start}
+.adm-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.adm-acts .btn{height:34px;padding:0 12px;font-size:13px}
+.adm-boost{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.chips.wrap{flex-wrap:wrap}
+.adm .seg button{font-size:13px;padding:0 4px;min-width:0}

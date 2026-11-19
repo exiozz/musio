@@ -1,10 +1,10 @@
 // Musio — service worker : l'app s'ouvre même sans connexion.
 // Change VERSION à chaque mise en ligne pour forcer le rafraîchissement du cache.
-const VERSION = 'musio-v6';
+const VERSION = 'musio-v7';
 const SHELL = [
   './', 'index.html', 'styles.css',
   'data.js', 'audio.js', 'legal.js', 'core.js', 'views.js', 'overlays.js', 'actions.js',
-  'vendor/jsmediatags.min.js', 'vendor/supabase.min.js', 'config.js', 'auth.js', 'cloud.js', 'logo.svg', 'logo-180.png', 'manifest.webmanifest',
+  'vendor/jsmediatags.min.js', 'vendor/supabase.min.js', 'config.js', 'auth.js', 'cloud.js', 'admin.js', 'logo.svg', 'logo-180.png', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-192.png', 'icons/maskable-512.png',
 ];
 

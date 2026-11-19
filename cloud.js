@@ -147,9 +147,12 @@ async function loadTracks(force) {
   if (U.tab === 'feed' && U.feedMode === 'music' && !hasScreen()) renderView();
 }
 function cloudTracksHTML() {
-  const list = (window.CLOUD_TRACKS || []).slice(0, 30);
-  if (!window.MUSIO_CLOUD || !list.length) return '';
-  return `<div class="sec-h"><h2>Publiés sur Musio</h2><button class="chip glass" data-a="playList" data-q="${list.map(x => x.id).join(',')}" data-src="Publiés sur Musio">${icf('play', 14)}Tout lire</button></div>
+  const all = window.CLOUD_TRACKS || [], up = typeof isBoosted === 'function' ? all.filter(t => isBoosted('track', t.cloudId)) : [];
+  const list = all.filter(t => !up.includes(t)).slice(0, 30);
+  if (!window.MUSIO_CLOUD || !all.length) return '';
+  const featured = up.length ? `<div class="sec-h"><h2>À la une</h2><span class="boost-tag">${ic('sparkle', 12)}Mis en avant</span></div><div class="hscroll">${up.map(t => `<button class="mixcard big" data-a="playTrack" data-id="${t.id}" data-q="${up.map(x => x.id).join(',')}" data-src="À la une">${cover(t, 168, 28)}<b>${esc(t.title)}</b><small>${esc(t.artist)}</small></button>`).join('')}</div>` : '';
+  if (!list.length) return featured;
+  return featured + `<div class="sec-h"><h2>Publiés sur Musio</h2><button class="chip glass" data-a="playList" data-q="${list.map(x => x.id).join(',')}" data-src="Publiés sur Musio">${icf('play', 14)}Tout lire</button></div>
     <div class="panel glass"><div class="tracklist">${list.map(x => trackRow(x, list.map(y => y.id), 'Publiés sur Musio')).join('')}</div></div>`;
 }
 function publishBtnHTML(t) {
@@ -273,4 +276,4 @@ function bootCloud() {
   A.feedMode = el => { baseFeedMode(el); if (U.feedMode === 'music') loadTracks(); };
 }
 // appelé une fois le compte connecté
-function cloudSignedIn() { if (!SB) return; loadComms(true); loadTracks(true); }
+function cloudSignedIn() { if (!SB) return; loadComms(true); loadTracks(true); if (typeof adminSignedIn === 'function') adminSignedIn(); }
