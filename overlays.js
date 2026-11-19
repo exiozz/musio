@@ -199,12 +199,10 @@ OV.postView = {
 
 // ---------- ABONNÉS / ABONNEMENTS ----------
 function followData(id) {
-  const pool = FRIENDS.concat(D.others, D.profiles).filter(u => u.id !== id && !blocked(u.id));
-  if (id === 'me') return { followers: FRIENDS.concat(D.profiles.filter(p => S.match.matches.some(m => m.id === p.id) || hashN('f' + p.id) % 2 === 0)).filter(u => !blocked(u.id)), following: S.followed.map(user).filter(u => !blocked(u.id)), followersTotal: S.me.followers, followingTotal: S.followed.length };
-  const u = user(id), base = hashN(id);
-  const followers = pool.filter(x => hashN(id + x.id) % 3 === 0).concat(S.followed.includes(id) ? [user('me')] : []);
-  const following = pool.filter(x => hashN(x.id + id) % 4 === 0);
-  return { followers, following, followersTotal: (u.verified ? 40000 + base % 900000 : 80 + base % 2400) + (S.followed.includes(id) ? 1 : 0), followingTotal: 40 + base % 400 };
+  // uniquement des liens réels (aucun abonné inventé)
+  if (id === 'me') { const following = S.followed.map(user).filter(u => !blocked(u.id)); return { followers: [], following, followersTotal: S.me.followers || 0, followingTotal: following.length }; }
+  const followers = S.followed.includes(id) ? [user('me')] : [], following = [];
+  return { followers, following, followersTotal: followers.length, followingTotal: 0 };
 }
 OV.follows = {
   kind: 'screen', label: 'Abonnés',
@@ -240,7 +238,7 @@ OV.profile = {
     const posts = isB || locked ? [] : S.posts.filter(p => p.author === o.id);
     const t = fr ? T(fr.trackId) : prof ? T(prof.anthem) : null;
     const at = u.artist ? D.tracks.filter(x => x.artist.indexOf(u.artist) === 0) : [];
-    const base = hashN(o.id); const followers = u.verified ? 40000 + base % 900000 : 80 + base % 2400; const following = 40 + base % 400;
+    const fd = followData(o.id), followers = fd.followersTotal, following = fd.followingTotal;
     const bio = u.bio || (prof && prof.bio) || (fr ? `Écoute surtout du ${T(fr.trackId).genre.toLowerCase()}. ${fr.place}.` : '');
     return head('@' + esc(u.handle || u.name), moreBtn('user', o.id)) + `<div class="scroll">
       <div class="prof glass strong">${avatar(u, 96)}<div><h2 style="font-size:24px">${esc(u.name)}${prof ? ', ' + prof.age : ''}${verified(u)}${prof && prof.private ? `<span class="privtag" style="margin-left:6px">${ic('lock', 12)}Privé</span>` : ''}</h2><div class="handle">${u.handle ? '@' + esc(u.handle) : prof ? prof.compat + ' % de compatibilité · à ' + distTxt(prof.dist) : ''}</div></div>${bio ? `<p class="bio">${esc(bio)}</p>` : ''}
@@ -456,7 +454,7 @@ OV.onboarding = {
     let b = acct && typeof authStepHTML === 'function' ? authStepHTML(o) : '';
     if (o.step === 0) b = `<div class="ob-hero"><span class="logo-mark">${LOGO(110)}</span><span class="wordmark">Musio</span><p class="t2" style="font-size:17px;max-width:300px">La musique, ensemble. Partage ce que tu écoutes, découvre ce qu’écoutent tes amis.</p></div>
       <div class="ob-feats">${[['feed', 'Un feed en musique', 'Vidéos, photos et sons, en plein écran.'], ['map', 'La Map de tes amis', 'Vois en direct ce qu’ils écoutent.'], ['match', 'Des rencontres musicales', 'Trouve les personnes qui ont tes goûts.']].map(([i, t, s]) => `<div class="ob-feat glass">${ic(i, 24)}<span class="tt"><b>${t}</b><small>${s}</small></span></div>`).join('')}</div>
-      <div class="grow"></div>${cloud ? `<button class="btn primary block" data-a="authGo" data-id="signup">Créer un compte</button><button class="btn glass block" data-a="authGo" data-id="login">J’ai déjà un compte</button>` : `<button class="btn primary block" data-a="obStep" data-id="1">Commencer</button>`}`;
+      <div class="grow"></div>${cloud ? `${typeof oauthHTML === 'function' ? oauthHTML(false) : ''}<button class="btn primary block" data-a="authGo" data-id="signup">${typeof OAUTH !== 'undefined' && OAUTH.list && OAUTH.list.length ? 'Continuer avec un e-mail' : 'Créer un compte'}</button><button class="btn glass block" data-a="authGo" data-id="login">J’ai déjà un compte</button>` : `<button class="btn primary block" data-a="obStep" data-id="1">Commencer</button>`}`;
     if (o.step === 1) b = `<h1>Ton profil</h1><p class="t2">Choisis une photo et un nom. Tu pourras les changer plus tard.</p>
       <label class="avatar-pick" id="pfAv" aria-label="Choisir une photo de profil">${avatar(user('me'), 120)}<span class="cam glass tint">${ic('camera', 20)}</span><input type="file" accept="image/*" class="sr" data-ch="avatar"></label>
       <div class="field"><label for="obName">Nom</label><input id="obName" class="glass" data-in="obName" value="${esc(o.name)}" placeholder="Ton prénom ou pseudo" maxlength="30" autocomplete="off"></div>

@@ -15,6 +15,8 @@ Musio est une application web installable (PWA) : elle s'ajoute à l'écran d'ac
 ## Fonctionnalités
 
 - Comptes avec e-mail et mot de passe (Supabase) : inscription, confirmation par e-mail, mot de passe oublié, déconnexion, suppression du compte
+- Anti-robots Cloudflare Turnstile et « Continuer avec Apple / Google » (affichés dès qu'ils sont activés)
+- Vraie carte (MapLibre + OpenFreeMap, gratuite et sans clé) avec ta position arrondie au quartier
 - Rôle « Créateur de Musio » : badge sur le profil, attribué ou retiré par un autre créateur (Réglages › Créateurs de Musio)
 - Lecteur complet : file d'attente, aléatoire, répétition, paroles, minuterie de sommeil, fond aux couleurs de la pochette
 - Import de tes propres sons (MP3, M4A, WAV…) avec lecture des titres, artistes et pochettes intégrés
@@ -50,7 +52,8 @@ Vide `config.js` pour faire tourner Musio sans comptes en ligne (mode local).
 | `core.js` | état, stockage local, rendu de base, icônes, logo |
 | `views.js` / `overlays.js` | écrans et fenêtres |
 | `actions.js` | interactions |
-| `auth.js` / `config.js` | comptes en ligne (Supabase) |
+| `auth.js` / `config.js` | comptes en ligne (Supabase), anti-robots, Apple / Google |
+| `vendor/maplibre/` | moteur de carte (MapLibre GL, licence BSD) |
 | `audio.js` | moteur audio (Web Audio API) |
 | `data.js` | contenu de démonstration |
 | `legal.js` | textes légaux (modèles à compléter) |

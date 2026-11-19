@@ -51,6 +51,7 @@ function canned(c) {
   return pick(['Trop bien', 'Haha j’avoue', 'Je t’envoie un son après', 'Ok ça marche', 'Ça me parle']);
 }
 async function reply(c) {
+  return; // pas de réponses automatiques : seuls de vrais utilisateurs répondent
   if (U.typing[c.id] || blocked(c.with)) return;
   const u = user(c.with);
   await wait(700); U.typing[c.id] = true; updateMsgs(c);
@@ -79,6 +80,7 @@ Ta réponse :`;
   save(); updateMsgs(c);
 }
 async function commReply(k) {
+  return; // pas de messages automatiques dans les communautés
   await wait(1400);
   const name = pick(k.crew); const hist = k.posts.slice(-8).map(p => `${p.me ? S.me.name : p.user} : ${p.text || (p.track ? `[partage « ${T(p.track).title} » de ${T(p.track).artist}]` : '[partage une publication]')}`).join('\n');
   const prompt = `Tu es ${name}, membre de la communauté « ${k.name} » (${k.desc}) dans Musio, une app de musique sociale. Réponds au dernier message du fil comme dans un chat de groupe : en français, une seule phrase courte et naturelle, ton amical et respectueux. Pas de guillemets, pas de prénom en préfixe, pas de hashtag. Ne dis jamais que tu es une IA.
@@ -136,8 +138,8 @@ A.follow = el => {
   const id = el.dataset.id, i = S.followed.indexOf(id), u = user(id), prof = D.profiles.find(p => p.id === id);
   if (i >= 0) { S.followed.splice(i, 1); toast(`Tu ne suis plus ${u.name}`, avatar(u, 30)); }
   else if (S.requested.includes(id)) { S.requested = S.requested.filter(x => x !== id); toast('Demande annulée', avatar(u, 30)); }
-  else if (prof && prof.private) { S.requested.push(id); haptic(); toast(`Demande envoyée à ${u.name}`, avatar(u, 30)); setTimeout(() => { if (!S.requested.includes(id)) return; S.requested = S.requested.filter(x => x !== id); S.followed.push(id); save(); addActivity('follow', id, 'a accepté ta demande d’abonnement'); refreshOv('profile'); refreshOv('follows'); }, 9000); }
-  else { S.followed.push(id); haptic(); toast(`Tu suis maintenant ${u.name}`, avatar(u, 30)); if (Math.random() < 0.5 && !u.verified) setTimeout(() => addActivity('follow', id, 'te suit en retour'), 5000); }
+  else if (prof && prof.private) { S.requested.push(id); haptic(); toast(`Demande envoyée à ${u.name}`, avatar(u, 30)); }
+  else { S.followed.push(id); haptic(); toast(`Tu suis maintenant ${u.name}`, avatar(u, 30)); }
   save(); $$(`.follow-plus[data-id="${id}"]`).forEach(b => b.remove());
   if (topOv() && topOv().type === 'more') pop();
   refreshOv('profile'); refreshOv('search'); refreshOv('follows');
@@ -197,10 +199,11 @@ A.deletePl = el => { const id = el.dataset.id; U.dialogFn = () => { S.playlists 
 // map
 A.mapMode = el => { U.mapMode = el.dataset.id; renderView(); };
 A.mapPanel = () => { U.mapPanel = !U.mapPanel; renderView(); };
-A.ghost = () => { S.settings.shareListening = !S.settings.shareListening; save(); renderView(); toast(S.settings.shareListening ? 'Tes amis voient à nouveau ton écoute' : 'Mode fantôme : tes amis ne te voient plus', ic(S.settings.shareListening ? 'eye' : 'ghost', 20)); };
-A.zoom = el => zoomBy(+el.dataset.id);
-A.recenter = () => centerOn(ME_POS.x, ME_POS.y, 40);
-A.friend = el => { if (U.mapMoved && Date.now() - U.mapMoved < 300) return; const f = FRIENDS.find(x => x.id === el.dataset.id); if (U.tab === 'map' && $('#map')) centerOn(f.x, f.y, isDesk() ? 0 : 120); push('friend', { id: f.id }); };
+A.ghost = () => { S.settings.shareListening = !S.settings.shareListening; save(); renderView(); syncMarkers(); toast(S.settings.shareListening ? 'Tes amis voient à nouveau ton écoute' : 'Mode fantôme : tes amis ne te voient plus', ic(S.settings.shareListening ? 'eye' : 'ghost', 20)); };
+A.zoom = el => mapZoom(+el.dataset.id);
+A.recenter = () => { if (GEO.pos) mapFlyTo(GEO.pos.lng, GEO.pos.lat); else locateMe(); };
+A.locate = () => locateMe();
+A.friend = el => { if (U.mapMoved && Date.now() - U.mapMoved < 300) return; const f = FRIENDS.find(x => x.id === el.dataset.id); if (U.tab === 'map' && $('#map') && isFinite(f.lat)) mapFlyTo(f.lng, f.lat, isDesk() ? 0 : 120); push('friend', { id: f.id }); };
 A.listenWith = el => { const f = FRIENDS.find(x => x.id === el.dataset.id); playTrack(f.trackId, { queue: [f.trackId], at: 20 + hashN(f.id) % 60, source: 'Avec ' + f.name }); if (topOv() && OV[topOv().type].kind === 'sheet') pop(); toast(`Tu écoutes avec ${f.name}`, avatar(f, 30)); };
 A.openChatWith = el => openChatWith(el.dataset.id);
 // match
@@ -342,7 +345,7 @@ A.publish = () => {
   if (p.vis === 'Moi seulement') { U.tab = 'account'; U.accTab = 'posts'; renderAll(); toast('Publié, visible seulement par toi', ic('lock', 20)); return; }
   U.tab = 'feed'; U.feedMode = 'foryou'; U.activePost = p.id;
   renderAll(); setActivePost(p.id, true); toast('Ta publication est en ligne', ic('check', 20)); haptic(20);
-  setTimeout(() => { p.likes += 3 + Math.floor(Math.random() * 20); p.views = (p.views || 0) + 60 + Math.floor(Math.random() * 400); updatePostDOM(p.id); save(); const f = pick(FRIENDS); addActivity('like', f.id, 'a aimé ta publication'); if (S.settings.notif.activite) toast(`${f.name} a aimé ta publication`, avatar(f, 30)); }, 7000);
+  // pas de faux likes ni de fausses vues : les chiffres viendront des vrais utilisateurs
 };
 
 // ---------- formulaires & saisies ----------
@@ -660,7 +663,7 @@ document.addEventListener('scroll', e => {
   if (y > last + 8 && y > 90) app.classList.add('tabs-min'); else if (y < last - 8 || y < 40) app.classList.remove('tabs-min');
   U.lastScrollY = y;
 }, true);
-let rsT; window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { lenses(); if (U.tab === 'map') applyMap(false); }, 120); });
+let rsT; window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { lenses(); if (U.tab === 'map' && MAPGL.map) MAPGL.map.resize(); }, 120); });
 // effet 3D sur la pochette au survol de la souris (lissé image par image, sans transition CSS)
 const tilt = { el: null, tx: 0, ty: 0, x: 0, y: 0, tl: 1, l: 1, tg: 0, g: 0, gx: 50, gy: 50, raf: 0 };
 function tiltStep() {

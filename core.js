@@ -12,7 +12,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const ago = ts => { const m = Math.round((Date.now() - ts) / 60000); if (m < 1) return 'à l’instant'; if (m < 60) return m + ' min'; const h = Math.round(m / 60); if (h < 24) return h + ' h'; return Math.round(h / 24) + ' j'; };
-const postViews = p => p.views != null ? p.views : Math.round(p.likes * 6.3) + 12;
+const postViews = p => p.views || 0;
 const hashN = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
 const haptic = (ms = 8) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} };
 const isDesk = () => window.matchMedia('(min-width: 900px)').matches;
@@ -178,7 +178,6 @@ const blocked = id => S.blocked.includes(id);
 function totals(id) {
   const mine = S.posts.filter(p => p.author === id);
   let likes = mine.reduce((a, p) => a + p.likes + (S.likedPosts.includes(p.id) ? 1 : 0), 0), views = mine.reduce((a, p) => a + postViews(p), 0);
-  if (id !== 'me') { const u = user(id) || {}, b = hashN(id + 'L'); likes += u.verified ? 200000 + b % 4000000 : 300 + b % 9000; views += Math.round(likes * (5 + b % 4)); }
   return { likes, views };
 }
 function user(id) {

@@ -134,97 +134,105 @@ function viewMusic() {
 }
 
 // ---------- MAP ----------
-const MAPSVG = (() => {
-  let s = '<defs><radialGradient id="mapglow" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#1B1640"/><stop offset="1" stop-color="#0E0C1C"/></radialGradient></defs><rect width="1200" height="1400" fill="url(#mapglow)"/>';
-  for (let x = -40; x < 1260; x += 92) s += `<path d="M${x} -20 L${x + 70} 1420" stroke="#1C1834" stroke-width="5"/>`;
-  for (let y = 30; y < 1480; y += 86) s += `<path d="M-20 ${y} L1220 ${y - 50}" stroke="#1C1834" stroke-width="5"/>`;
-  s += '<rect x="70" y="300" width="300" height="220" rx="60" fill="#13291F"/><rect x="690" y="120" width="230" height="160" rx="40" fill="#13291F"/><ellipse cx="960" cy="1180" rx="190" ry="120" fill="#13291F"/>';
-  s += '<path d="M-30 990 C 200 900, 380 1060, 600 975 S 1000 830, 1230 900" stroke="#173055" stroke-width="54" fill="none" stroke-linecap="round"/><path d="M560 -20 C 530 200, 610 380, 560 580 S 520 820, 600 975" stroke="#173055" stroke-width="20" fill="none"/>';
-  ['M-20 260 L1220 200', 'M-20 760 L1220 700', 'M330 -20 L380 1420', 'M880 -20 L830 1420', 'M-20 1320 L1220 120', 'M-20 520 C 400 560, 800 420, 1220 480'].forEach(d => { s += `<path d="${d}" stroke="#2B2650" stroke-width="16" fill="none" stroke-linecap="round"/>`; });
-  [['BELLEVILLE', 960, 400, 0], ['RÉPUBLIQUE', 420, 820, 0], ['BUTTES-CHAUMONT', 805, 205, 0], ['BASTILLE', 700, 1250, 0], ['OBERKAMPF', 960, 900, -4], ['MARAIS', 200, 1060, 0], ['LA SEINE', 300, 1000, 8], ['CANAL SAINT-MARTIN', 610, 300, -84]].forEach(([t, x, y, r]) => { s += `<text x="${x}" y="${y}" transform="rotate(${r} ${x} ${y})" fill="rgba(255,255,255,.3)" font-family="Sansation, sans-serif" font-size="13" font-weight="700" letter-spacing="2" text-anchor="middle">${t}</text>`; });
-  return s;
-})();
-const ME_POS = { x: 600, y: 720 };
-function markerHTML(f) {
-  const t = T(f.trackId);
-  return `<button class="marker" data-x="${f.x}" data-y="${f.y}" data-a="friend" data-id="${f.id}" aria-label="${esc(f.name)} ${f.live ? 'écoute' : 'a écouté'} ${esc(t.title)}"><span class="bubble glass strong">${f.live ? eqHTML() : ic('music', 14)}<span>${esc(t.title)}</span></span><span class="mk-av ${f.live ? 'live' : ''}" style="background:${f.color};color:${f.color}">${avatar(f, 44)}</span><span class="mk-name">${esc(f.name)}${f.live ? '' : ' · ' + f.ago}</span></button>`;
+// Vraie carte : MapLibre GL + tuiles OpenFreeMap (OpenStreetMap), gratuites et sans clé.
+// La carte est créée une seule fois et garde sa position quand l'écran se redessine.
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+const MAP_DEFAULT = { center: [2.3522, 48.8566], zoom: 11.5 };   // Paris, avant que la position soit connue
+const GEO = { pos: null, watching: false, err: '' };
+const MAPGL = { lib: null, map: null, el: null, markers: [], me: null, loading: null, failed: false };
+function loadMapLib() {
+  if (window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (!MAPGL.loading) MAPGL.loading = new Promise((res, rej) => {
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'vendor/maplibre/maplibre-gl.css'; document.head.appendChild(css);
+    const sc = document.createElement('script'); sc.src = 'vendor/maplibre/maplibre-gl.js'; sc.async = true;
+    sc.onload = () => window.maplibregl ? res(window.maplibregl) : rej(new Error('maplibre'));
+    sc.onerror = () => { MAPGL.loading = null; rej(new Error('maplibre')); };
+    document.head.appendChild(sc);
+  });
+  return MAPGL.loading;
 }
+// position arrondie (~100 m) : assez pour la carte, sans adresse exacte
+const roundGeo = (lat, lng) => ({ lat: Math.round(lat * 1000) / 1000, lng: Math.round(lng * 1000) / 1000 });
+function locateMe(fly) {
+  if (!navigator.geolocation) { GEO.err = 'Ton appareil ne permet pas la localisation.'; refreshMapUI(); return; }
+  GEO.asking = true; refreshMapUI();
+  navigator.geolocation.getCurrentPosition(p => {
+    GEO.asking = false; GEO.err = ''; GEO.pos = roundGeo(p.coords.latitude, p.coords.longitude);
+    S.geo = Object.assign({ on: true, at: Date.now() }, GEO.pos); save();
+    syncMarkers(); refreshMapUI();
+    if (MAPGL.map && fly !== false) MAPGL.map.flyTo({ center: [GEO.pos.lng, GEO.pos.lat], zoom: Math.max(MAPGL.map.getZoom(), 14), speed: 1.4 });
+  }, e => {
+    GEO.asking = false;
+    GEO.err = e && e.code === 1 ? 'Localisation refusée. Tu peux l’autoriser dans les réglages de ton navigateur.' : 'Position introuvable pour le moment.';
+    if (e && e.code === 1 && S.geo) { S.geo.on = false; save(); }
+    refreshMapUI();
+  }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 5 * 60000 });
+}
+function meMarkerEl() {
+  const t = T(P.trackId), el = document.createElement('div');
+  el.className = 'marker me';
+  el.innerHTML = S.settings.shareListening
+    ? `<span class="bubble glass strong">${t && E.isPlaying() ? eqHTML() + `<span>${esc(t.title)}</span>` : '<span>Toi</span>'}</span><span class="me-dot">${S.me.photo ? avatar(user('me'), 18) : ''}</span>`
+    : `<span class="bubble glass">${ic('ghost', 14)}<span>Mode fantôme</span></span><span class="me-dot" style="opacity:.4"></span>`;
+  return el;
+}
+function friendMarkerEl(f) {
+  const t = T(f.trackId), b = document.createElement('button');
+  b.className = 'marker'; b.dataset.a = 'friend'; b.dataset.id = f.id;
+  b.setAttribute('aria-label', `${f.name} ${f.live ? 'écoute' : 'a écouté'} ${t ? t.title : ''}`);
+  b.innerHTML = `<span class="bubble glass strong">${f.live ? eqHTML() : ic('music', 14)}<span>${esc(t ? t.title : '')}</span></span><span class="mk-av ${f.live ? 'live' : ''}" style="background:${f.color};color:${f.color}">${avatar(f, 44)}</span><span class="mk-name">${esc(f.name)}${f.live ? '' : ' · ' + (f.ago || '')}</span>`;
+  return b;
+}
+const mapFriends = () => FRIENDS.filter(f => !blocked(f.id) && (U.mapMode === 'all' || f.live) && isFinite(f.lat) && isFinite(f.lng));
+function syncMarkers() {
+  const map = MAPGL.map, lib = MAPGL.lib; if (!map || !lib) return;
+  MAPGL.markers.forEach(m => m.remove()); MAPGL.markers = [];
+  if (MAPGL.me) { MAPGL.me.remove(); MAPGL.me = null; }
+  if (GEO.pos) MAPGL.me = new lib.Marker({ element: meMarkerEl(), anchor: 'bottom' }).setLngLat([GEO.pos.lng, GEO.pos.lat]).addTo(map);
+  mapFriends().forEach(f => MAPGL.markers.push(new lib.Marker({ element: friendMarkerEl(f), anchor: 'bottom' }).setLngLat([f.lng, f.lat]).addTo(map)));
+}
+// petites zones de l'écran Map qui changent sans redessiner la carte
+function geoCardHTML() {
+  if (MAPGL.failed) return `<div class="geo-card glass strong">${ic('info', 20)}<span class="grow tt"><b>Carte indisponible</b><small>Vérifie ta connexion Internet puis rouvre la Map.</small></span></div>`;
+  if (GEO.pos) return '';
+  return `<div class="geo-card glass strong">${ic('locate', 22)}<span class="grow tt"><b>${GEO.asking ? 'Localisation…' : 'Apparais sur la Map'}</b><small>${esc(GEO.err || 'Ta position est arrondie à ton quartier. Tu peux passer en mode fantôme à tout moment.')}</small></span>${GEO.asking ? '' : `<button class="btn primary sm-btn" data-a="locate">Activer</button>`}</div>`;
+}
+function refreshMapUI() { const c = $('#geoCard'); if (c) c.innerHTML = geoCardHTML(); }
 VIEWS.map = () => {
   const fl = FRIENDS.filter(f => !blocked(f.id) && (U.mapMode === 'all' || f.live)), live = fl.filter(f => f.live);
-  const t = T(P.trackId);
-  const me = S.settings.shareListening
-    ? `<div class="marker me" data-x="${ME_POS.x}" data-y="${ME_POS.y}"><span class="bubble glass strong">${t && E.isPlaying() ? eqHTML() + `<span>${esc(t.title)}</span>` : '<span>Toi</span>'}</span><span class="me-dot">${S.me.photo ? avatar(user('me'), 18) : ''}</span></div>`
-    : `<div class="marker me" data-x="${ME_POS.x}" data-y="${ME_POS.y}"><span class="bubble glass">${ic('ghost', 14)}<span>Mode fantôme</span></span><span class="me-dot" style="opacity:.4"></span></div>`;
-  return `<div class="map" id="map"><svg class="map-svg" id="mapSvg" viewBox="0 0 1200 1400" preserveAspectRatio="none" aria-hidden="true">${MAPSVG}</svg><div class="map-pins" id="mapPins">${me}${fl.map(markerHTML).join('')}</div></div>
+  return `<div class="map" id="map"></div>
     <div class="map-top"><div class="map-head glass strong lens"><h1>Map</h1>${seg('map', [['live', 'En direct'], ['all', '24 h']], U.mapMode, 'mapMode')}</div><button class="icon-btn glass strong ${S.settings.shareListening ? '' : 'on'}" style="width:52px;height:52px" data-a="ghost" aria-pressed="${!S.settings.shareListening}" aria-label="Mode fantôme">${ic(S.settings.shareListening ? 'eye' : 'ghost')}</button></div>
-    <div class="map-zoom glass strong"><button class="icon-btn" data-a="zoom" data-id="1.25" aria-label="Zoomer">${ic('plus')}</button><button class="icon-btn" data-a="zoom" data-id="0.8" aria-label="Dézoomer">${ic('minus')}</button><button class="icon-btn" data-a="recenter" aria-label="Me recentrer">${ic('locate')}</button></div>
+    <div class="map-zoom glass strong"><button class="icon-btn" data-a="zoom" data-id="1" aria-label="Zoomer">${ic('plus')}</button><button class="icon-btn" data-a="zoom" data-id="-1" aria-label="Dézoomer">${ic('minus')}</button><button class="icon-btn" data-a="recenter" aria-label="Me localiser">${ic('locate')}</button></div>
+    <div id="geoCard" class="geo-wrap">${geoCardHTML()}</div>
     <div class="dock glass strong ${U.mapPanel ? 'open' : ''}">
-      <button class="dock-head" data-a="mapPanel" aria-expanded="${U.mapPanel}"><span class="tt"><b>${live.length} ami${live.length > 1 ? 's' : ''} en direct</b><small>${U.mapPanel ? 'Touche un ami pour écouter avec lui' : fl.length - live.length ? `+ ${fl.length - live.length} ces dernières 24 h` : 'Ce que tes amis écoutent, maintenant'}</small></span><span class="icon-btn sm glass">${ic(U.mapPanel ? 'down' : 'up', 18)}</span></button>
+      <button class="dock-head" data-a="mapPanel" aria-expanded="${U.mapPanel}"><span class="tt"><b>${live.length} ami${live.length > 1 ? 's' : ''} en direct</b><small>${fl.length ? (U.mapPanel ? 'Touche un ami pour écouter avec lui' : fl.length - live.length ? `+ ${fl.length - live.length} ces dernières 24 h` : 'Ce que tes amis écoutent, maintenant') : 'Suis des personnes pour voir ce qu’elles écoutent'}</small></span><span class="icon-btn sm glass">${ic(U.mapPanel ? 'down' : 'up', 18)}</span></button>
       ${U.mapPanel
-        ? `<div class="list dock-list">${fl.map(f => { const tr = T(f.trackId); return `<button class="li" data-a="friend" data-id="${f.id}">${avatar(f, 44)}<span class="grow tt"><b>${esc(f.name)} <span class="t3" style="font-weight:500">· ${esc(f.place)}</span></b><small>${esc(tr.title)} — ${esc(tr.artist)}</small></span>${f.live ? eqHTML() : `<small class="t3">${f.ago}</small>`}</button>`; }).join('')}</div>`
+        ? `<div class="list dock-list">${fl.map(f => { const tr = T(f.trackId); return `<button class="li" data-a="friend" data-id="${f.id}">${avatar(f, 44)}<span class="grow tt"><b>${esc(f.name)}${f.place ? ` <span class="t3" style="font-weight:500">· ${esc(f.place)}</span>` : ''}</b><small>${esc(tr.title)} — ${esc(tr.artist)}</small></span>${f.live ? eqHTML() : `<small class="t3">${f.ago || ''}</small>`}</button>`; }).join('')}</div>`
         : `<div class="dock-avs">${fl.map(f => `<button class="dock-av" data-a="friend" data-id="${f.id}" aria-label="${esc(f.name)}"><span class="mk-av ${f.live ? 'live' : ''}" style="background:${f.color};color:${f.color}">${avatar(f, 42)}</span><small>${esc(f.name)}</small></button>`).join('')}</div>`}
     </div>`;
 };
-function clampMap(m) {
-  const map = $('#map'); if (!map) return m; const w = map.clientWidth, h = map.clientHeight;
-  m.z = clamp(m.z, 0.45, 2.6);
-  m.x = clamp(m.x, Math.min(120, w - 1200 * m.z - 120), Math.max(120, w - 1200 * m.z - 120)); m.y = clamp(m.y, Math.min(160, h - 1400 * m.z - 160), Math.max(160, h - 1400 * m.z - 160));
-  return m;
-}
-function drawMap() {
-  const map = $('#map'), svg = $('#mapSvg'); if (!map || !svg || !U.mapT) return;
-  const m = U.mapT, w = map.clientWidth, h = map.clientHeight;
-  svg.setAttribute('viewBox', `${(-m.x / m.z).toFixed(2)} ${(-m.y / m.z).toFixed(2)} ${(w / m.z).toFixed(2)} ${(h / m.z).toFixed(2)}`);
-  $$('#mapPins .marker').forEach(el => { const x = +el.dataset.x * m.z + m.x, y = +el.dataset.y * m.z + m.y; el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%)`; });
-}
-let mapAnim = 0, mapGoal = null;
-function applyMap(animate, target) {
-  if (!U.mapT) return;
-  cancelAnimationFrame(mapAnim); mapGoal = null;
-  if (!animate) { if (target) Object.assign(U.mapT, target); clampMap(U.mapT); drawMap(); return; }
-  const from = Object.assign({}, U.mapT), to = clampMap(Object.assign({}, U.mapT, target || {})); mapGoal = to;
-  const t0 = performance.now(), dur = 420, ease = k => 1 - Math.pow(1 - k, 3);
-  const step = now => { const k = Math.min(1, (now - t0) / dur), e = ease(k);
-    const z = from.z * Math.pow(to.z / from.z, e);
-    U.mapT.z = z; U.mapT.x = from.x + (to.x - from.x) * e; U.mapT.y = from.y + (to.y - from.y) * e; drawMap();
-    if (k < 1) mapAnim = requestAnimationFrame(step); else mapGoal = null; };
-  mapAnim = requestAnimationFrame(step);
-}
-function centerOn(x, y, dy) { const map = $('#map'); if (!map) return; const z = U.mapT.z; applyMap(true, { x: map.clientWidth / 2 - x * z, y: map.clientHeight / 2 - y * z - (dy || 0) }); }
-function zoomBy(f, cx, cy, instant) {
-  const map = $('#map'); if (!map) return; const r = map.getBoundingClientRect();
-  cx = cx == null ? r.width / 2 : cx - r.left; cy = cy == null ? r.height / 2 : cy - r.top;
-  const m = (!instant && mapGoal) || U.mapT, z = clamp(m.z * f, 0.45, 2.6);
-  applyMap(!instant, { z, x: cx - (cx - m.x) * (z / m.z), y: cy - (cy - m.y) * (z / m.z) });
-}
 AFTER.map = () => {
-  const map = $('#map'); if (!map) return;
-  if (!U.mapT) { const z = isDesk() ? 1 : 0.85; U.mapT = { z, x: map.clientWidth / 2 - ME_POS.x * z, y: map.clientHeight / 2 - ME_POS.y * z - 40 }; }
-  applyMap(false);
-  const pts = new Map(); let st = null;
-  const snap = () => ({ t: Object.assign({}, U.mapT), pts: new Map(Array.from(pts, ([k, v]) => [k, Object.assign({}, v)])), moved: st ? st.moved : false });
-  map.addEventListener('pointerdown', e => { cancelAnimationFrame(mapAnim); mapGoal = null; pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); st = snap(); st.moved = false; U.mapDrag = true; });
-  map.addEventListener('pointermove', e => {
-    if (!pts.has(e.pointerId) || !st) return;
-    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const a = Array.from(pts.values()), b = Array.from(st.pts.values());
-    if (a.length === 1 && b.length === 1) {
-      const dx = a[0].x - b[0].x, dy = a[0].y - b[0].y;
-      if (Math.abs(dx) + Math.abs(dy) > 6) st.moved = true;
-      if (!st.moved) return;
-      U.mapT.x = st.t.x + dx; U.mapT.y = st.t.y + dy;
-    } else if (a.length >= 2 && b.length >= 2) {
-      const d1 = Math.hypot(b[0].x - b[1].x, b[0].y - b[1].y) || 1, d2 = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
-      const r = map.getBoundingClientRect(); const cx = (b[0].x + b[1].x) / 2 - r.left, cy = (b[0].y + b[1].y) / 2 - r.top;
-      const z = clamp(st.t.z * d2 / d1, 0.45, 2.6);
-      U.mapT.z = z; U.mapT.x = cx - (cx - st.t.x) * (z / st.t.z); U.mapT.y = cy - (cy - st.t.y) * (z / st.t.z); st.moved = true;
-    }
-    applyMap(false);
-  });
-  const end = e => { if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId); if (st && st.moved) U.mapMoved = Date.now(); st = pts.size ? snap() : null; if (!pts.size) U.mapDrag = false; };
-  map.addEventListener('pointerup', end); map.addEventListener('pointercancel', end);
-  map.addEventListener('wheel', e => { e.preventDefault(); zoomBy(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)), e.clientX, e.clientY, true); }, { passive: false });
+  const slot = $('#map'); if (!slot) return;
+  if (MAPGL.el) { slot.appendChild(MAPGL.el); if (MAPGL.map) { MAPGL.map.resize(); syncMarkers(); } }
+  else {
+    MAPGL.el = document.createElement('div'); MAPGL.el.className = 'map-gl'; slot.appendChild(MAPGL.el);
+    loadMapLib().then(lib => {
+      MAPGL.lib = lib;
+      const start = S.geo && isFinite(S.geo.lat) ? { center: [S.geo.lng, S.geo.lat], zoom: 13.5 } : MAP_DEFAULT;
+      MAPGL.map = new lib.Map({ container: MAPGL.el, style: MAP_STYLE, center: start.center, zoom: start.zoom, minZoom: 2, maxZoom: 18, attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, cooperativeGestures: false });
+      MAPGL.map.touchZoomRotate.disableRotation();
+      MAPGL.map.addControl(new lib.AttributionControl({ compact: true }), 'top-right');
+      MAPGL.map.on('error', e => { if (e && e.error && /style|Failed to fetch/i.test(String(e.error.message || ''))) { MAPGL.failed = true; refreshMapUI(); } });
+      MAPGL.map.on('load', () => { MAPGL.failed = false; refreshMapUI(); });
+      MAPGL.map.on('dragstart', () => { U.mapDrag = true; }); MAPGL.map.on('dragend', () => { U.mapDrag = false; U.mapMoved = Date.now(); });
+      syncMarkers();
+    }).catch(() => { MAPGL.failed = true; refreshMapUI(); });
+  }
+  // position déjà autorisée : on la rafraîchit sans redemander
+  if (S.geo && S.geo.on && !GEO.pos) { GEO.pos = { lat: S.geo.lat, lng: S.geo.lng }; locateMe(false); }
 };
+function mapZoom(dir) { if (MAPGL.map) MAPGL.map.easeTo({ zoom: MAPGL.map.getZoom() + dir, duration: 300 }); }
+function mapFlyTo(lng, lat, offsetY) { if (MAPGL.map) MAPGL.map.flyTo({ center: [lng, lat], zoom: Math.max(MAPGL.map.getZoom(), 14), offset: [0, -(offsetY || 0)], speed: 1.4 }); }
 
 // ---------- MATCH ----------
 function deck() {
@@ -282,7 +290,7 @@ function swipe(dir) {
     if (dir === 'left') S.match.passed.push(id);
     else {
       S.match.liked.push(id);
-      if (p.likesYou || dir === 'up') { S.match.matches.unshift({ id, at: Date.now() }); S.match.newCount++; addActivity('match', id, 'et toi, c’est un match'); push('matchModal', { id }); haptic(30); }
+      if (p.likesYou) { S.match.matches.unshift({ id, at: Date.now() }); S.match.newCount++; addActivity('match', id, 'et toi, c’est un match'); push('matchModal', { id }); haptic(30); }
       else toast(`Like envoyé à ${p.name}`, ic('heart', 20));
     }
     save(); renderView(); renderChrome();

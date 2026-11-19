@@ -5,12 +5,82 @@
 // Sans config.js rempli, l'app fonctionne comme avant, en mode local (données sur l'appareil).
 
 const CFG = window.MUSIO_CONFIG || {};
+// erreur renvoyée par Apple / Google / Supabase dans l'adresse au retour (lue avant que le client ne touche à l'URL)
+const RET_ERR = (() => { const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1)); const d = q.get('error_description') || h.get('error_description'); return d ? d.replace(/\+/g, ' ') : null; })();
 const SB = (CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null;
 window.MUSIO_CLOUD = !!SB;
 const AUTH = { user: null, recovery: false, booted: false };
 const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
+
+// ---------- anti-robots (Cloudflare Turnstile) ----------
+// Le jeton est demandé au moment d'envoyer le formulaire. Dans la plupart des cas
+// rien ne s'affiche ; si Cloudflare a un doute, une petite vérification apparaît.
+const TS_KEY = CFG.turnstileSiteKey || '';
+const CAP = { widget: null, done: null, fail: null, loading: null };
+function loadTurnstile() {
+  if (window.turnstile) return Promise.resolve(window.turnstile);
+  if (!CAP.loading) CAP.loading = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    sc.async = true; sc.onload = () => window.turnstile ? res(window.turnstile) : rej(new Error('captcha'));
+    sc.onerror = () => { CAP.loading = null; rej(new Error('captcha')); };
+    document.head.appendChild(sc);
+  });
+  return CAP.loading;
+}
+function captchaToken() {
+  if (!TS_KEY) return Promise.resolve(undefined);
+  return loadTurnstile().then(ts => new Promise((res, rej) => {
+    let host = document.getElementById('captchaHost');
+    if (!host) {
+      host = document.createElement('div'); host.id = 'captchaHost'; host.className = 'captcha-host glass strong';
+      host.innerHTML = '<b>Vérification anti-robots</b><small>Une seconde, on vérifie que tu es bien humain.</small><div id="captchaBox"></div>';
+      document.body.appendChild(host);
+    }
+    const end = () => { clearTimeout(tm); host.classList.remove('on'); CAP.done = CAP.fail = null; };
+    const tm = setTimeout(() => { if (CAP.fail) CAP.fail(); }, 90000);
+    CAP.done = t => { end(); res(t); };
+    CAP.fail = () => { end(); rej(new Error('captcha')); };
+    if (CAP.widget == null) {
+      CAP.widget = ts.render('#captchaBox', {
+        sitekey: TS_KEY, theme: 'dark', language: 'fr', execution: 'execute', appearance: 'interaction-only',
+        callback: t => CAP.done && CAP.done(t),
+        'error-callback': () => { if (CAP.fail) CAP.fail(); return true; },
+        'expired-callback': () => {},
+        'before-interactive-callback': () => host.classList.add('on'),
+        'after-interactive-callback': () => host.classList.remove('on'),
+      });
+    } else { try { ts.reset(CAP.widget); } catch (e) {} }
+    ts.execute(CAP.widget);
+  }));
+}
+// ---------- Continuer avec Apple / Google ----------
+// Les boutons n'apparaissent que pour les fournisseurs activés dans Supabase (Authentication › Sign In / Providers).
+const OAUTH = { list: null };
+const OAUTH_NAME = { apple: 'Apple', google: 'Google' };
+async function loadProviders() {
+  try {
+    const r = await fetch(CFG.supabaseUrl + '/auth/v1/settings', { headers: { apikey: CFG.supabaseAnonKey } });
+    const ext = ((await r.json()) || {}).external || {};
+    OAUTH.list = ['apple', 'google'].filter(p => ext[p]);
+  } catch (e) { OAUTH.list = []; }
+  if (U.ov.some(o => o.type === 'onboarding')) refreshOv('onboarding');
+}
+function oauthHTML(sep) {
+  if (!OAUTH.list || !OAUTH.list.length) return '';
+  const busy = obState().busy ? 'disabled' : '';
+  return `<div class="oauth">${OAUTH.list.map(p => `<button type="button" class="btn block oauth-btn oauth-${p}" data-a="authOAuth" data-id="${p}" ${busy}>Continuer avec ${OAUTH_NAME[p]}</button>`).join('')}</div>${sep ? '<div class="or" role="separator"><span>ou</span></div>' : ''}`;
+}
+A.authOAuth = async el => {
+  const p = el.dataset.id; if (!OAUTH_NAME[p]) return;
+  obSet({ busy: true, err: '' });
+  const { error } = await SB.auth.signInWithOAuth({ provider: p, options: { redirectTo: APP_URL } });
+  if (error) obSet({ busy: false, err: authErr(error) });
+};
+function urlAuthError() { if (RET_ERR) { try { history.replaceState(null, '', location.pathname); } catch (e) {} } return RET_ERR; }
+const CAPTCHA_ERR = 'La vérification anti-robots n’a pas abouti. Vérifie ta connexion puis réessaie.';
 
 if (SB) SB.auth.onAuthStateChange((event, session) => {
   AUTH.user = session ? session.user : null;
@@ -20,6 +90,9 @@ if (SB) SB.auth.onAuthStateChange((event, session) => {
 // ---------- messages d'erreur lisibles ----------
 function authErr(e) {
   const m = String((e && (e.message || e.error_description)) || e || '').toLowerCase();
+  if (/captcha/.test(m)) return CAPTCHA_ERR;
+  if (/provider is not enabled|unsupported provider/.test(m)) return 'Cette méthode de connexion n’est pas encore activée.';
+  if (/access_denied|user denied|cancel/.test(m)) return 'Connexion annulée.';
   if (/email address not authorized|not authorized/.test(m)) return 'Les e-mails de Musio ne sont pas encore activés pour cette adresse. Réessaie plus tard ou contacte l’équipe Musio.';
   if (/invalid login credentials/.test(m)) return 'E-mail ou mot de passe incorrect.';
   if (/email not confirmed/.test(m)) return 'Confirme d’abord ton adresse e-mail : clique sur le lien reçu (regarde aussi dans les spams).';
@@ -65,6 +138,7 @@ function wipeLocal() {
   E.pause(); S = fresh(); FRIENDS = clone(D.friends);
   Object.assign(P, { trackId: null, queue: [], qi: 0, shuffle: false, repeat: 'off', lyrics: false, source: '', post: null });
   Object.assign(U, { tab: 'feed', ov: [], activePost: null, typing: {} });
+  if (typeof GEO !== 'undefined') { GEO.pos = null; GEO.err = ''; if (typeof syncMarkers === 'function') syncMarkers(); }
   applyTheme();
 }
 // après une connexion réussie : profil existant → app ; sinon → création du profil
@@ -80,7 +154,9 @@ async function afterSignIn(u) {
     return;
   }
   S.uid = u.id; save();
-  U.ob = Object.assign(U.ob || {}, { step: 1, name: U.ob && U.ob.name || '', handle: U.ob && U.ob.handle || '', genres: [], age: !!(U.ob && U.ob.age), terms: !!(U.ob && U.ob.terms), err: '', busy: false });
+  const md = u.user_metadata || {};
+  if (!S.me.name && (md.full_name || md.name)) S.me.name = String(md.full_name || md.name).trim().slice(0, 30);
+  U.ob = Object.assign(U.ob || {}, { step: 1, name: U.ob && U.ob.name || String(md.full_name || md.name || '').trim().slice(0, 30), handle: U.ob && U.ob.handle || '', genres: [], age: !!(U.ob && U.ob.age), terms: !!(U.ob && U.ob.terms), err: '', busy: false });
   if (!U.ov.some(o => o.type === 'onboarding')) { U.ov = []; push('onboarding'); } else refreshOv('onboarding');
 }
 
@@ -90,15 +166,15 @@ function authStepHTML(o) {
   const busy = o.busy ? 'disabled' : '';
   const email = `<div class="field"><label for="auEmail">Adresse e-mail</label><input id="auEmail" class="glass" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" value="${esc(o.email || '')}" placeholder="toi@exemple.fr" required></div>`;
   const pass = (id, label, ac) => `<div class="field"><label for="${id}">${label}</label><div class="pw"><input id="${id}" class="glass" type="password" autocomplete="${ac}" minlength="8" required placeholder="8 caractères minimum"><button type="button" class="pw-eye" data-a="authEye" data-id="${id}" aria-label="Afficher le mot de passe">${ic('eye', 18)}</button></div></div>`;
-  if (o.step === 'signup') return `<h1>Créer ton compte</h1><p class="t2">Ton e-mail sert à te connecter et à récupérer ton compte.</p>
+  if (o.step === 'signup') return `<h1>Créer ton compte</h1><p class="t2">${OAUTH.list && OAUTH.list.length ? 'En un clic, ou avec ton adresse e-mail.' : 'Ton e-mail sert à te connecter et à récupérer ton compte.'}</p>${oauthHTML(true)}
     <form class="auth-form" data-form="authSignup">${email}${pass('auPass', 'Mot de passe', 'new-password')}
       <div class="group glass" style="padding:6px 16px">
         <div class="check ${o.age ? 'on' : ''}"><button type="button" class="box" data-a="obCheck" data-id="age" role="checkbox" aria-checked="${!!o.age}" aria-label="J’ai 15 ans ou plus">${o.age ? icf('check', 16) : ''}</button><span>J’ai <b>15 ans ou plus</b>. Si j’ai moins de 18 ans, mes parents sont informés.</span></div>
         <div class="check ${o.terms ? 'on' : ''}"><button type="button" class="box" data-a="obCheck" data-id="terms" role="checkbox" aria-checked="${!!o.terms}" aria-label="J’accepte les conditions">${o.terms ? icf('check', 16) : ''}</button><span>J’accepte les <button type="button" class="lnk" data-a="legal" data-id="cgu">Conditions d’utilisation</button> et la <button type="button" class="lnk" data-a="legal" data-id="privacy">Politique de confidentialité</button>.</span></div>
       </div>${err}
       <button type="submit" class="btn primary block" ${busy || (o.age && o.terms ? '' : 'disabled')}>${o.busy ? 'Création…' : 'Créer mon compte'}</button>
-      <p class="t2" style="text-align:center;font-size:14px">Déjà inscrit·e ? <button type="button" class="lnk" data-a="authGo" data-id="login">Se connecter</button></p></form>`;
-  if (o.step === 'login') return `<h1>Se connecter</h1><p class="t2">Content de te revoir.</p>
+      ${TS_KEY ? `<p class="t3 cap-note">${ic('shield', 14)}Protégé contre les robots par Cloudflare Turnstile.</p>` : ''}<p class="t2" style="text-align:center;font-size:14px">Déjà inscrit·e ? <button type="button" class="lnk" data-a="authGo" data-id="login">Se connecter</button></p></form>`;
+  if (o.step === 'login') return `<h1>Se connecter</h1><p class="t2">Content de te revoir.</p>${oauthHTML(true)}
     <form class="auth-form" data-form="authLogin">${email}${pass('auPass', 'Mot de passe', 'current-password')}
       <button type="button" class="lnk" style="align-self:flex-end;font-size:14px" data-a="authGo" data-id="forgot">Mot de passe oublié ?</button>${err}
       <button type="submit" class="btn primary block" ${busy}>${o.busy ? 'Connexion…' : 'Se connecter'}</button>
@@ -113,7 +189,7 @@ const obState = () => U.ob || (U.ob = { step: 0, name: '', handle: '', genres: [
 function obSet(d) { const pw = $('#auPass'), v = pw ? pw.value : ''; Object.assign(obState(), d); refreshOv('onboarding'); const p2 = $('#auPass'); if (p2 && v && !p2.value) p2.value = v; }
 function keepEmail() { const i = $('#auEmail'); if (i) obState().email = i.value.trim(); }
 
-A.authGo = el => { keepEmail(); obSet({ step: el.dataset.id, err: '', busy: false }); const s = $('.obs .ob'); if (s) s.scrollTop = 0; setTimeout(() => { const i = $('#auEmail'); if (i && !i.value) i.focus(); else { const p = $('#auPass'); if (p) p.focus(); } }, 120); };
+A.authGo = el => { if (TS_KEY) loadTurnstile().catch(() => {}); keepEmail(); obSet({ step: el.dataset.id, err: '', busy: false }); const s = $('.obs .ob'); if (s) s.scrollTop = 0; setTimeout(() => { const i = $('#auEmail'); if (i && !i.value) i.focus(); else { const p = $('#auPass'); if (p) p.focus(); } }, 120); };
 A.authEye = el => { const i = $('#' + el.dataset.id); if (!i) return; i.type = i.type === 'password' ? 'text' : 'password'; el.setAttribute('aria-label', i.type === 'password' ? 'Afficher le mot de passe' : 'Masquer le mot de passe'); };
 
 FORMS.authSignup = async () => {
@@ -124,7 +200,8 @@ FORMS.authSignup = async () => {
   if (!okPass(pw)) return obSet({ err: 'Mot de passe trop faible : 8 caractères minimum, avec des lettres et des chiffres.' });
   if (!o.age || !o.terms) return obSet({ err: 'Coche les deux cases pour continuer.' });
   obSet({ busy: true, err: '' });
-  const { data, error } = await SB.auth.signUp({ email, password: pw, options: { emailRedirectTo: APP_URL } });
+  let captcha; try { captcha = await captchaToken(); } catch (e) { return obSet({ busy: false, err: CAPTCHA_ERR }); }
+  const { data, error } = await SB.auth.signUp({ email, password: pw, options: { emailRedirectTo: APP_URL, captchaToken: captcha } });
   if (error) return obSet({ busy: false, err: authErr(error) });
   S.consents.at = Date.now(); o.accepted = true; save();
   if (data.session) { obSet({ busy: false }); return afterSignIn(data.session.user); }
@@ -136,7 +213,8 @@ FORMS.authLogin = async () => {
   o.email = email;
   if (!okEmail(email) || !pw) return obSet({ err: 'Indique ton e-mail et ton mot de passe.' });
   obSet({ busy: true, err: '' });
-  const { data, error } = await SB.auth.signInWithPassword({ email, password: pw });
+  let captcha; try { captcha = await captchaToken(); } catch (e) { return obSet({ busy: false, err: CAPTCHA_ERR }); }
+  const { data, error } = await SB.auth.signInWithPassword({ email, password: pw, options: { captchaToken: captcha } });
   if (error) return obSet({ busy: false, err: authErr(error) });
   obSet({ busy: false });
   afterSignIn(data.user);
@@ -146,14 +224,16 @@ FORMS.authForgot = async () => {
   const email = $('#auEmail').value.trim(); o.email = email;
   if (!okEmail(email)) return obSet({ err: 'Cette adresse e-mail n’est pas valide.' });
   obSet({ busy: true, err: '' });
-  const { error } = await SB.auth.resetPasswordForEmail(email, { redirectTo: APP_URL });
+  let captcha; try { captcha = await captchaToken(); } catch (e) { return obSet({ busy: false, err: CAPTCHA_ERR }); }
+  const { error } = await SB.auth.resetPasswordForEmail(email, { redirectTo: APP_URL, captchaToken: captcha });
   if (error) return obSet({ busy: false, err: authErr(error) });
   obSet({ step: 'check', mailFor: 'reset', busy: false });
 };
 A.authResend = async () => {
   const o = obState(); if (o.busy || !o.email) return;
   obSet({ busy: true, err: '' });
-  const { error } = await SB.auth.resend({ type: 'signup', email: o.email, options: { emailRedirectTo: APP_URL } });
+  let captcha; try { captcha = await captchaToken(); } catch (e) { return obSet({ busy: false, err: CAPTCHA_ERR }); }
+  const { error } = await SB.auth.resend({ type: 'signup', email: o.email, options: { emailRedirectTo: APP_URL, captchaToken: captcha } });
   obSet({ busy: false, err: error ? authErr(error) : '' });
   if (!error) toast('E-mail renvoyé', ic('check', 20));
 };
@@ -275,6 +355,8 @@ async function bootAccounts() {
     push('dialog', { title: 'Supprimer ton compte ?', text: 'Ton compte, ton profil et toutes les données de cet appareil seront effacés. Cette action est définitive.', ok: 'Supprimer', danger: true });
   };
 
+  loadProviders();
+  const retErr = urlAuthError();
   let session = null;
   try { session = (await SB.auth.getSession()).data.session; } catch (e) {}
   AUTH.booted = true;
@@ -291,4 +373,5 @@ async function bootAccounts() {
     }
   }
   if (AUTH.recovery) push('authNewPass');
+  if (retErr && !session) { obSet({ err: authErr(retErr) }); toast(authErr(retErr), ic('info', 20)); }
 }
