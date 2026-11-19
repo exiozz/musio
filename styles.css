@@ -857,3 +857,11 @@ label.btn{cursor:pointer}
 /* avant la création du compte : ni navigation, ni lecteur, ni onglet Toi */
 #app.pre-ob #side,#app.pre-ob #tabs,#app.pre-ob #mini{display:none!important}
 @media (min-width:900px){ #app.pre-ob :is(#view,#overlays,#toasts){left:0} }
+
+/* comptes */
+.auth-form{display:flex;flex-direction:column;gap:14px}
+.auth-form input{width:100%}
+.pw{position:relative}.pw input{padding-right:48px!important}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;display:grid;place-items:center;border-radius:12px;color:var(--t2)}
+.auth-err{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;color:#FF8A94;font-size:14px;line-height:1.4}
+.auth-err .ic{flex:none;margin-top:1px}

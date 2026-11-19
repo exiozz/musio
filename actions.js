@@ -296,11 +296,12 @@ function doReset(account) {
 }
 // accueil
 function startOnboarding() { U.ob = { step: 0, name: '', handle: '', genres: [], age: false, terms: false }; push('onboarding'); }
-A.obStep = el => { const to = +el.dataset.id; if (U.ob.step === 1 && to === 2 && !U.ob.name.trim()) { toast('Choisis un nom pour ton profil', ic('info', 20)); const i = $('#obName'); if (i) i.focus(); return; } U.ob.step = to; refreshOv('onboarding'); const s = $('.obs .ob'); if (s) s.scrollTop = 0; };
+A.obStep = el => { const to = +el.dataset.id; if (typeof U.ob.step === 'string') { U.ob.step = 0; U.ob.err = ''; refreshOv('onboarding'); return; } if (U.ob.step === 1 && to === 2 && !U.ob.name.trim()) { toast('Choisis un nom pour ton profil', ic('info', 20)); const i = $('#obName'); if (i) i.focus(); return; } U.ob.step = to; refreshOv('onboarding'); const s = $('.obs .ob'); if (s) s.scrollTop = 0; };
 A.obGenre = el => { const g = el.dataset.id, a = U.ob.genres, i = a.indexOf(g); if (i >= 0) a.splice(i, 1); else { a.push(g); haptic(); } refreshOv('onboarding'); };
 A.obCheck = el => { U.ob[el.dataset.id] = !U.ob[el.dataset.id]; haptic(); refreshOv('onboarding'); };
 A.obFinish = () => {
   const o = U.ob; if (!o.age || !o.terms) return;
+  if (window.MUSIO_CLOUD && typeof cloudFinish === 'function') return cloudFinish();
   S.me.name = o.name.trim().slice(0, 30);
   S.me.handle = (o.handle.trim() || o.name.trim() || 'musio').replace(/^@/, '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.]+/g, '.').toLowerCase().slice(0, 24) || 'musio';
   S.prefs.genres = o.genres.slice(); S.consents.at = Date.now(); S.onboarded = true; save();
@@ -693,5 +694,5 @@ document.addEventListener('pointerleave', untilt); window.addEventListener('blur
 if (P.trackId && T(P.trackId)) E.load(T(P.trackId), 0); else P.trackId = null;
 if (isDesk() && S.settings.device === 'Ce téléphone') S.settings.device = 'Cet ordinateur';
 applyTheme(); renderAll(); requestAnimationFrame(tick);
-if (!S.onboarded) startOnboarding();
+if (typeof bootAccounts === 'function') bootAccounts(); else if (!S.onboarded) startOnboarding();
 window.__echo = { get S() { return S; }, U, P, A, renderAll, push, pop };

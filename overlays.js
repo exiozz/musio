@@ -450,12 +450,13 @@ OV.prompt = { kind: 'modal', html: o => `<form class="dialog glass strong" data-
 // ---------- ACCUEIL (premier lancement) ----------
 OV.onboarding = {
   kind: 'screen', label: 'Bienvenue', locked: true, cls: 'obs',
-  html: () => { const o = U.ob; const dots = `<div class="ob-dots" aria-hidden="true">${[0, 1, 2, 3].map(i => `<i class="${i === o.step ? 'on' : ''}"></i>`).join('')}</div>`;
-    const back = o.step ? `<button class="icon-btn glass strong" data-a="obStep" data-id="${o.step - 1}" aria-label="Retour">${ic('back')}</button>` : '<span></span>';
-    let b = '';
+  html: () => { const o = U.ob, cloud = !!window.MUSIO_CLOUD, acct = typeof o.step === 'string';
+    const dots = acct ? '<span></span>' : `<div class="ob-dots" aria-hidden="true">${[0, 1, 2, 3].map(i => `<i class="${i === o.step ? 'on' : ''}"></i>`).join('')}</div>`;
+    const back = acct ? `<button class="icon-btn glass strong" data-a="obStep" data-id="0" aria-label="Retour">${ic('back')}</button>` : o.step && !(cloud && o.step === 1) ? `<button class="icon-btn glass strong" data-a="obStep" data-id="${o.step - 1}" aria-label="Retour">${ic('back')}</button>` : '<span></span>';
+    let b = acct && typeof authStepHTML === 'function' ? authStepHTML(o) : '';
     if (o.step === 0) b = `<div class="ob-hero"><span class="logo-mark">${LOGO(110)}</span><span class="wordmark">Musio</span><p class="t2" style="font-size:17px;max-width:300px">La musique, ensemble. Partage ce que tu écoutes, découvre ce qu’écoutent tes amis.</p></div>
       <div class="ob-feats">${[['feed', 'Un feed en musique', 'Vidéos, photos et sons, en plein écran.'], ['map', 'La Map de tes amis', 'Vois en direct ce qu’ils écoutent.'], ['match', 'Des rencontres musicales', 'Trouve les personnes qui ont tes goûts.']].map(([i, t, s]) => `<div class="ob-feat glass">${ic(i, 24)}<span class="tt"><b>${t}</b><small>${s}</small></span></div>`).join('')}</div>
-      <div class="grow"></div><button class="btn primary block" data-a="obStep" data-id="1">Commencer</button>`;
+      <div class="grow"></div>${cloud ? `<button class="btn primary block" data-a="authGo" data-id="signup">Créer un compte</button><button class="btn glass block" data-a="authGo" data-id="login">J’ai déjà un compte</button>` : `<button class="btn primary block" data-a="obStep" data-id="1">Commencer</button>`}`;
     if (o.step === 1) b = `<h1>Ton profil</h1><p class="t2">Choisis une photo et un nom. Tu pourras les changer plus tard.</p>
       <label class="avatar-pick" id="pfAv" aria-label="Choisir une photo de profil">${avatar(user('me'), 120)}<span class="cam glass tint">${ic('camera', 20)}</span><input type="file" accept="image/*" class="sr" data-ch="avatar"></label>
       <div class="field"><label for="obName">Nom</label><input id="obName" class="glass" data-in="obName" value="${esc(o.name)}" placeholder="Ton prénom ou pseudo" maxlength="30" autocomplete="off"></div>
@@ -465,14 +466,14 @@ OV.onboarding = {
       <div class="ob-genres">${GENRES.map((g, i) => { const on = o.genres.includes(g); const c = PALETTE[i]; return `<button class="ob-genre glass ${on ? 'on' : ''}" data-a="obGenre" data-id="${g}" aria-pressed="${on}" style="--gc:${c}"><span class="cover" style="width:44px;height:44px;border-radius:14px;background:${c}">${shapeHTML(['disc', 'ring', 'diamond', 'dome', 'pill', 'stripes'][i])}</span><b>${g}</b>${on ? `<span class="ob-check">${icf('check', 16)}</span>` : ''}</button>`; }).join('')}</div>
       <div class="grow"></div><button class="btn primary block" data-a="obStep" data-id="3" ${o.genres.length ? '' : 'disabled'}>Continuer</button><button class="btn glass block" data-a="obStep" data-id="3">Passer</button>`;
     if (o.step === 3) { const ok = o.age && o.terms;
-      b = `<h1>Avant de commencer</h1><p class="t2">Quelques règles simples pour que tout le monde se sente bien sur Musio.</p>
-      <div class="group glass" style="padding:6px 16px">
+      b = `<h1>${o.accepted ? 'Tes choix' : 'Avant de commencer'}</h1><p class="t2">${o.accepted ? 'Dernière étape : choisis ce que Musio peut faire avec tes données.' : 'Quelques règles simples pour que tout le monde se sente bien sur Musio.'}</p>
+      ${o.accepted ? '' : `<div class="group glass" style="padding:6px 16px">
         <div class="check ${o.age ? 'on' : ''}"><button class="box" data-a="obCheck" data-id="age" role="checkbox" aria-checked="${o.age}" aria-label="J’ai 15 ans ou plus">${o.age ? icf('check', 16) : ''}</button><span>J’ai <b>15 ans ou plus</b>. Si j’ai moins de 18 ans, mes parents sont informés.</span></div>
-        <div class="check ${o.terms ? 'on' : ''}"><button class="box" data-a="obCheck" data-id="terms" role="checkbox" aria-checked="${o.terms}" aria-label="J’accepte les conditions">${o.terms ? icf('check', 16) : ''}</button><span>J’accepte les <button class="lnk" data-a="legal" data-id="cgu">Conditions d’utilisation</button> et les <button class="lnk" data-a="legal" data-id="community">Règles de la communauté</button>, et j’ai lu la <button class="lnk" data-a="legal" data-id="privacy">Politique de confidentialité</button>.</span></div></div>
+        <div class="check ${o.terms ? 'on' : ''}"><button class="box" data-a="obCheck" data-id="terms" role="checkbox" aria-checked="${o.terms}" aria-label="J’accepte les conditions">${o.terms ? icf('check', 16) : ''}</button><span>J’accepte les <button class="lnk" data-a="legal" data-id="cgu">Conditions d’utilisation</button> et les <button class="lnk" data-a="legal" data-id="community">Règles de la communauté</button>, et j’ai lu la <button class="lnk" data-a="legal" data-id="privacy">Politique de confidentialité</button>.</span></div></div>`}
       <p class="group-t">Tes choix (facultatifs)</p>
       <div class="group glass">${swRow('Personnalisation', 'consents.reco', 'Un fil et des suggestions selon tes goûts')}${swRow('Mesure d’audience', 'consents.audience', 'Statistiques anonymes')}${swRow('Publicité personnalisée', 'consents.ads', 'Désactivée par défaut')}</div>
       <p class="t3" style="font-size:12px">Modifiable à tout moment dans Réglages › Consentements. <button class="lnk" data-a="legal" data-id="cookies">En savoir plus</button></p>
-      <div class="grow"></div><button class="btn primary block" data-a="obFinish" ${ok ? '' : 'disabled'}>Créer mon compte</button>`; }
+      <div class="grow"></div><button class="btn primary block" data-a="obFinish" ${ok && !o.busy ? '' : 'disabled'}>${o.busy ? 'Création du profil…' : cloud ? 'Terminer' : 'Créer mon compte'}</button>`; }
     return `<div class="ob"><div class="row" style="justify-content:space-between">${back}${dots}<span style="width:44px"></span></div>${b}</div>`; },
 };
 
