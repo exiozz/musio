@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07060F">
+<title>Musio</title>
+<meta name="description" content="Musio : la musique, ensemble. Écoute, publie des vidéos et des photos en musique, retrouve tes amis sur la Map et fais des matchs musicaux.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Musio">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="apple-touch-icon" href="logo-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Typographie : Sansation (Google Fonts). Pour changer, remplacer ici et dans --head / --ui (styles.css) -->
+<link href="https://fonts.googleapis.com/css2?family=Sansation:ital,wght@0,300;0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="cgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5FE0E6"/><stop offset=".55" stop-color="#3CB9BF"/><stop offset="1" stop-color="#38558A"/></linearGradient><linearGradient id="vgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8BE9FF"/><stop offset=".5" stop-color="#2E9BFF"/><stop offset="1" stop-color="#7C5CFF"/></linearGradient>
+    <radialGradient id="vshine" cx="32%" cy="22%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".45" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <filter id="lg-lens" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.011" numOctaves="2" seed="11" result="n"/>
+      <feGaussianBlur in="n" stdDeviation="2.5" result="nb"/>
+      <feDisplacementMap in="SourceGraphic" in2="nb" scale="28" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+<div id="app">
+  <div class="waves" aria-hidden="true"><div class="wl w1"><div class="wv"></div></div><div class="wl w2"><div class="wv"></div></div><div class="wl w3"><div class="wv"></div></div><div class="wl w4"><div class="wv"></div></div></div>
+  <aside id="side"></aside>
+  <main id="view"></main>
+  <div id="mini" class="glass strong lens hide"></div>
+  <nav id="tabs" aria-label="Navigation principale"></nav>
+  <div id="overlays"></div>
+  <div id="toasts" aria-live="polite"></div>
+</div>
+<script src="data.js"></script>
+<script src="audio.js"></script>
+<script src="legal.js"></script>
+<script src="core.js"></script>
+<script src="views.js"></script>
+<script src="overlays.js"></script>
+<script src="vendor/jsmediatags.min.js"></script>
+<script src="actions.js"></script>
+<script>
+// installation hors ligne (ignorée là où les service workers ne sont pas permis)
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} });
+}
+</script>
+</body>
+</html>

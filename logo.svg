@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="mz-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B4A57"/><stop offset="1" stop-color="#161D25"/></linearGradient>
+    <linearGradient id="mz-teal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7DF0F2"/><stop offset=".5" stop-color="#3CC4CB"/><stop offset="1" stop-color="#2A98A6"/></linearGradient>
+    <linearGradient id="mz-navy" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5B86D6"/><stop offset=".55" stop-color="#3A5C9E"/><stop offset="1" stop-color="#27406F"/></linearGradient>
+    <clipPath id="mz-clip"><rect x="3" y="3" width="58" height="58" rx="17"/></clipPath>
+    <filter id="mz-puff" x="-15%" y="-15%" width="130%" height="140%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.4" result="h"/>
+      <feDiffuseLighting in="h" surfaceScale="5" diffuseConstant="1.18" lighting-color="#fff" result="d"><feDistantLight azimuth="250" elevation="52"/></feDiffuseLighting>
+      <feGaussianBlur in="d" stdDeviation=".45" result="d"/>
+      <feComposite in="SourceGraphic" in2="d" operator="arithmetic" k1="1.12" result="lit"/>
+      <feSpecularLighting in="h" surfaceScale="5" specularConstant="1.1" specularExponent="26" lighting-color="#fff" result="s"><fePointLight x="16" y="-8" z="34"/></feSpecularLighting>
+      <feGaussianBlur in="s" stdDeviation=".45" result="s"/>
+      <feComposite in="lit" in2="s" operator="arithmetic" k2="1" k3=".75" result="shine"/>
+      <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="4" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .14 0" result="grain"/>
+      <feBlend in="grain" in2="shine" mode="overlay" result="rubber"/>
+      <feComposite in="rubber" in2="SourceAlpha" operator="in" result="body"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="sb"/>
+      <feOffset in="sb" dy="1.6" result="so"/>
+      <feFlood flood-color="#05080C" flood-opacity=".55"/>
+      <feComposite in2="so" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="body"/></feMerge>
+    </filter>
+    <filter id="mz-pad" x="-10%" y="-10%" width="120%" height="125%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.2" result="h"/>
+      <feSpecularLighting in="h" surfaceScale="3" specularConstant=".7" specularExponent="18" lighting-color="#cfefff" result="s"><fePointLight x="18" y="-14" z="40"/></feSpecularLighting>
+      <feGaussianBlur in="s" stdDeviation=".6" result="s"/>
+      <feComposite in="SourceGraphic" in2="s" operator="arithmetic" k2="1" k3=".5" result="lit"/>
+      <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" seed="9" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .18 0" result="grain"/>
+      <feBlend in="grain" in2="lit" mode="overlay" result="rubber"/>
+      <feComposite in="rubber" in2="SourceAlpha" operator="in"/>
+    </filter>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="17" fill="url(#mz-bg)" filter="url(#mz-pad)"/>
+  <g filter="url(#mz-puff)"><g clip-path="url(#mz-clip)">
+    <path fill="url(#mz-teal)" d="M0 32C5 20 12 14.5 18.5 22 22.5 26.5 25 34 31 35.5 37 37 40 26.5 45 20 50 13.5 56.5 16.5 64 27V64H0Z"/>
+  </g></g>
+  <g filter="url(#mz-puff)"><g clip-path="url(#mz-clip)">
+    <path fill="url(#mz-navy)" d="M0 44C5 34.5 11.5 31 18 36.5 22 40 25 46 31 47 37 48 40 40.5 45 35.5 50 30.5 56.5 32 64 40V64H0Z"/>
+  </g></g>
+</svg>
