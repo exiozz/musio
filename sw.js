@@ -1,6 +1,6 @@
 // Musio — service worker : l'app s'ouvre même sans connexion.
 // Change VERSION à chaque mise en ligne pour forcer le rafraîchissement du cache.
-const VERSION = 'musio-v1';
+const VERSION = 'musio-v2';
 const SHELL = [
   './', 'index.html', 'styles.css',
   'data.js', 'audio.js', 'legal.js', 'core.js', 'views.js', 'overlays.js', 'actions.js',

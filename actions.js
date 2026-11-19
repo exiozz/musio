@@ -296,13 +296,13 @@ function doReset(account) {
 }
 // accueil
 function startOnboarding() { U.ob = { step: 0, name: '', handle: '', genres: [], age: false, terms: false }; push('onboarding'); }
-A.obStep = el => { U.ob.step = +el.dataset.id; refreshOv('onboarding'); const s = $('.obs .ob'); if (s) s.scrollTop = 0; };
+A.obStep = el => { const to = +el.dataset.id; if (U.ob.step === 1 && to === 2 && !U.ob.name.trim()) { toast('Choisis un nom pour ton profil', ic('info', 20)); const i = $('#obName'); if (i) i.focus(); return; } U.ob.step = to; refreshOv('onboarding'); const s = $('.obs .ob'); if (s) s.scrollTop = 0; };
 A.obGenre = el => { const g = el.dataset.id, a = U.ob.genres, i = a.indexOf(g); if (i >= 0) a.splice(i, 1); else { a.push(g); haptic(); } refreshOv('onboarding'); };
 A.obCheck = el => { U.ob[el.dataset.id] = !U.ob[el.dataset.id]; haptic(); refreshOv('onboarding'); };
 A.obFinish = () => {
   const o = U.ob; if (!o.age || !o.terms) return;
-  S.me.name = o.name.trim() || 'Toi';
-  S.me.handle = (o.handle.trim() || o.name.trim() || 'toi').replace(/^@/, '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.]+/g, '.').toLowerCase().slice(0, 24) || 'toi';
+  S.me.name = o.name.trim().slice(0, 30);
+  S.me.handle = (o.handle.trim() || o.name.trim() || 'musio').replace(/^@/, '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.]+/g, '.').toLowerCase().slice(0, 24) || 'musio';
   S.prefs.genres = o.genres.slice(); S.consents.at = Date.now(); S.onboarded = true; save();
   U.ov = []; renderAll(); toast(`Bienvenue sur Musio, ${S.me.name}`, avatar(user('me'), 30)); haptic(20);
 };
@@ -687,22 +687,6 @@ document.addEventListener('pointermove', e => {
   tiltKick();
 }, { passive: true });
 document.addEventListener('pointerleave', untilt); window.addEventListener('blur', untilt);
-
-// amis qui changent de son, pour une Map vivante
-setInterval(() => {
-  const live = FRIENDS.filter(f => f.live && !blocked(f.id)); if (!live.length) return;
-  const f = pick(live); const opts = D.tracks.filter(t => t.id !== f.trackId); f.trackId = pick(opts).id;
-  if (U.tab === 'map' && !hasScreen() && !U.mapDrag) renderView();
-  if (S.settings.notif.activite && S.onboarded && Math.random() < 0.5 && !U.ov.length) toast(`${f.name} écoute « ${T(f.trackId).title} »`, avatar(f, 30), () => { U.tab = 'map'; U.ov = []; renderAll(); A.friend({ dataset: { id: f.id } }); });
-}, 45000);
-
-// quelqu’un regarde ton profil de temps en temps
-setInterval(() => {
-  if (!S.onboarded || !S.settings.profileViews || Math.random() < 0.5) return;
-  const pool = D.profiles.map(p => p.id).concat(FRIENDS.map(f => f.id), D.others.map(o => o.id)).filter(id => !blocked(id) && user(id));
-  const id = pick(pool); S.pviews = S.pviews.filter(v => v.id !== id); S.pviews.unshift({ id, at: Date.now(), seen: false }); S.pviews = S.pviews.slice(0, 40); save();
-  if (U.tab === 'account' && !U.ov.length) renderView(); refreshOv('profileViews');
-}, 60000);
 
 // ================= DÉMARRAGE =================
 (S.myTracks || []).forEach(t => IDB.get(t.id).then(b => { if (b) AUDIO_SRC[t.id] = URL.createObjectURL(b); }).catch(() => {}));

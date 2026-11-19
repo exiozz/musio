@@ -112,28 +112,24 @@ const TSTYLES = [['classic', 'Classique'], ['display', 'Affiche'], ['pill', 'Ét
 const MAX_DIST = 300;
 
 // ---------- état ----------
-const KEY = 'echo-proto-v2';
+const KEY = 'musio-v1';
 function fresh() {
   const now = Date.now();
   return {
     onboarded: false,
-    me: { name: 'Toi', handle: 'toi', bio: 'Toujours un casque sur les oreilles.', color: '#FF5C8A', followers: 128, photo: null, banner: null },
+    me: { name: '', handle: '', bio: '', color: '#FF5C8A', followers: 0, photo: null, banner: null },
     settings: { profileViews: true, showMyVisits: true, accent: '#3D8BFF', blur: 24, orbs: true, autoplay: true, quality: 'Haute', volume: 80, device: 'Ce téléphone', shareListening: true, matchVisible: true, whoCanWrite: 'Tout le monde', private: false, listsVis: 'Tout le monde', notif: { messages: true, matchs: true, activite: true } },
     consents: { reco: true, audience: false, ads: false, at: null },
     prefs: { genres: [] },
-    likedTracks: ['t4', 't5', 't1'], likedPosts: [], followed: ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'u2'],
+    likedTracks: [], likedPosts: [], followed: [],
     blocked: [], hiddenPosts: [], reports: [], playlists: [], requested: [], trackArt: {}, myTracks: [],
-    echoes: [{ id: 'e1', post: 'p3', by: 'f3', text: 'Obligé de vous faire écouter ça, c’est trop doux', react: 'cry', img: null, at: now - 40 * 60000 }, { id: 'e2', post: 'p5', by: 'f6', text: 'Qui vient samedi ?', react: 'fire', img: null, at: now - 3 * 3600000 }],
-    pviews: [['m1', 12], ['f2', 38], ['m3', 95], ['u3', 160], ['m5', 300], ['f6', 540], ['m8', 900], ['m2', 1500], ['f4', 2600], ['m6', 4300], ['u5', 7000]].map(([id, m]) => ({ id, at: now - m * 60000, seen: m > 100 })),
+    echoes: [],
+    pviews: [],
     posts: clone(D.posts),
     convs: clone(D.convs).map(c => Object.assign(c, { msgs: c.msgs.map(m => Object.assign(m, { at: now - m.ago * 60000 })) })),
     communities: clone(D.communities).map(k => Object.assign(k, { posts: k.posts.map(p => Object.assign(p, { id: uid(), at: now - p.ago * 60000 })) })),
     match: { liked: [], passed: [], matches: [], newCount: 0, filters: { genres: [], dist: 100 } },
-    activity: [
-      { id: uid(), type: 'follow', user: 'f6', text: 'a commencé à te suivre', at: now - 26 * 60000, read: false },
-      { id: uid(), type: 'like', user: 'f1', text: 'a aimé ta playlist « Lo-fi pour bosser »', at: now - 3 * 3600000, read: false },
-      { id: uid(), type: 'comm', user: 'f4', text: 't’a mentionné dans Électro Paris', at: now - 20 * 3600000, read: true },
-    ],
+    activity: [],
     recent: [], listenSec: 0, player: null,
   };
 }
@@ -220,9 +216,10 @@ const myEcho = id => S.echoes.find(e => e.post === id && e.by === 'me');
 const artOf = o => o && o.id && S.trackArt && S.trackArt[o.id];
 const cover = (o, s = 48, r = 12, inner = '') => { const a = artOf(o); return `<span class="cover${a ? ' has-art' : ''}" style="width:${s}px;height:${s}px;border-radius:${r}px;background:${o.color}" aria-hidden="true">${a ? `<img class="art" src="${a}" alt="">` : shapeHTML(o.shape) + ring2(o.c2)}${inner}</span>`; };
 const eqHTML = (on = true) => `<span class="eq ${on ? '' : 'off'}" aria-hidden="true"><i></i><i></i><i></i></span>`;
-// badge « Créateur de Musio » : réservé au compte du créateur de l’app (toi)
+// badge « Créateur de Musio » : uniquement pour les comptes qui ont le rôle « creator »
+const isCreator = () => !!(S && S.me && S.me.role === 'creator');
 const cBadge = (s = 16) => `<svg class="vbadge cbadge" width="${s}" height="${s}" viewBox="0 0 24 24" role="img" aria-label="Créateur de Musio"><path d="${ROSETTE}" fill="url(#cgrad)"/><path d="M5.6 13.4c1.5-3.2 3-3.2 4.3 0s2.9 3.2 4.3 0 2.9-3.2 4.2 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M12 4.6l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 6.7l2-.3z" fill="#fff"/></svg>`;
-const verified = u => u && (u.id === 'me' || u.me) ? cBadge(16) : u && u.verified ? vBadge(16) : '';
+const verified = u => u && (u.id === 'me' || u.me) ? (isCreator() ? cBadge(16) : '') : u && u.verified ? vBadge(16) : '';
 const devIcon = () => ({ 'Ce téléphone': 'phone', 'Cet ordinateur': 'laptop', 'Casque sans fil': 'headphones', 'Enceinte du salon': 'speaker', 'Voiture': 'car' }[S.settings.device] || 'phone');
 function getK(key) { const [root, k] = key.split('.'); const o = { settings: S.settings, notif: S.settings.notif, consents: S.consents, create: U.create, ob: U.ob }[root]; return o ? o[k] : undefined; }
 function setK(key, v) { const [root, k] = key.split('.'); const o = { settings: S.settings, notif: S.settings.notif, consents: S.consents, create: U.create, ob: U.ob }[root]; if (o) o[k] = v; }
@@ -348,6 +345,7 @@ function badgeFor(id) {
   return 0;
 }
 function renderChrome() {
+  $('#app').classList.toggle('pre-ob', !S.onboarded); // pas de navigation ni de compte avant l’inscription
   const me = user('me');
   const tabs = TABS.filter(t => t[0] !== 'account');
   $('#tabs').innerHTML = `<div class="tabbar glass strong lens" data-lens="tabs"><i class="tab-lens" aria-hidden="true"></i>${tabs.map(([id, l, icn]) => {
