@@ -116,6 +116,7 @@ function cleanHandle(h, name) {
 
 // ---------- profil ----------
 function applyProfile(p) {
+  if (typeof cloudSignedIn === 'function') setTimeout(cloudSignedIn, 0);
   S.me.name = p.name; S.me.handle = p.handle; S.me.bio = p.bio || ''; S.me.color = p.color || S.me.color; S.me.role = p.role;
   if (Array.isArray(p.genres)) S.prefs.genres = p.genres.slice();
   S.uid = p.id; S.onboarded = true; save();
@@ -317,6 +318,7 @@ A.authLogout = () => { U.dialogFn = async () => { await SB.auth.signOut().catch(
 // ---------- démarrage ----------
 async function bootAccounts() {
   if (!SB) { if (!S.onboarded) startOnboarding(); return; }
+  if (typeof bootCloud === 'function') bootCloud();
 
   // cocher une case ne doit pas effacer l'e-mail et le mot de passe saisis
   const baseCheck = A.obCheck;

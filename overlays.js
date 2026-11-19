@@ -104,7 +104,8 @@ OV.playerMore = {
       <button class="li" data-a="shareTrack" data-id="${t.id}">${ic('share', 22)}<span class="grow">Partager à un ami</span></button>
       <button class="li" data-a="openArtist" data-id="${esc(t.artist)}">${ic('user', 22)}<span class="grow">Voir l’artiste</span></button>
       <button class="li" data-a="sleep">${ic('moon', 22)}<span class="grow">Minuterie de sommeil${left ? `<small class="t2" style="display:block">${left}</small>` : ''}</span></button>
-      <button class="li" data-a="queue">${ic('queue', 22)}<span class="grow">File d’attente</span></button></div>`; },
+      <button class="li" data-a="queue">${ic('queue', 22)}<span class="grow">File d’attente</span></button>
+      ${t.cloud && window.MUSIO_CLOUD && (isCreator() || t.ownerId === S.uid) ? `<button class="li danger" data-a="unpublishCloud" data-id="${t.id}">${ic('trash', 22)}<span class="grow">Retirer ce son de Musio${t.ownerId === S.uid ? '' : '<small class="t2" style="display:block">Modération</small>'}</span></button>` : ''}</div>`; },
 };
 OV.sleep = {
   kind: 'sheet', label: 'Minuterie',
@@ -118,7 +119,7 @@ OV.addToPlaylist = {
 // ---------- PARTAGE, COMMENTAIRES, SIGNALEMENT ----------
 OV.share = {
   kind: 'sheet', label: 'Partager',
-  html: o => { const what = o.track ? `« ${esc(T(o.track).title)} »` : 'cette publication'; const j = S.communities.filter(k => k.joined); const p = o.post && post(o.post);
+  html: o => { const what = o.track ? `« ${esc(T(o.track).title)} »` : 'cette publication'; const j = allComms().filter(k => k.joined); const p = o.post && post(o.post);
     return `<h2>Partager ${what}</h2><div class="stories">${FRIENDS.filter(f => !blocked(f.id)).map(f => `<button class="story" data-a="sendTo" data-id="${f.id}">${avatar(f, 56)}<span>${esc(f.name)}</span></button>`).join('')}</div>
     ${j.length ? `<p class="result-h">Dans une communauté</p><div class="list">${j.map(k => `<button class="li" data-a="sendToComm" data-id="${k.id}">${cover(k, 40, 12)}<span class="grow">${esc(k.name)}</span>${ic('send', 18)}</button>`).join('')}</div>` : ''}
     <div class="list"><button class="li" data-a="copyLink">${ic('link', 22)}<span class="grow">Copier le lien</span></button>
@@ -158,7 +159,8 @@ OV.more = {
     if (o.k === 'comm') { const k = comm(o.id);
       return `<div class="list"><button class="li" data-a="legal" data-id="community">${ic('users', 22)}<span class="grow">Règles de la communauté</span></button>
         <button class="li danger" data-a="report" data-k="comm" data-id="${k.id}">${ic('flag', 22)}<span class="grow">Signaler la communauté</span></button>
-        ${k.joined ? `<button class="li danger" data-a="join" data-id="${k.id}">${ic('close', 22)}<span class="grow">Quitter ${esc(k.name)}</span></button>` : ''}</div>`; }
+        ${k.joined && !k.mine ? `<button class="li danger" data-a="join" data-id="${k.id}">${ic('close', 22)}<span class="grow">Quitter ${esc(k.name)}</span></button>` : ''}
+        ${k.mine || (window.MUSIO_CLOUD && isCreator()) ? `<button class="li danger" data-a="deleteComm" data-id="${k.id}">${ic('trash', 22)}<span class="grow">Supprimer la communauté</span></button>` : ''}</div>`; }
     return '';
   },
 };
@@ -180,7 +182,7 @@ function searchResults() {
       <p class="result-h">Tendances</p><div class="chips wrap">${allTags().slice(0, 8).map(([t]) => `<button class="chip glass" data-a="tag" data-id="${esc(t)}">#${esc(t)}</button>`).join('')}</div>
       <p class="result-h">Personnes à suivre</p><div class="panel glass"><div class="list">${people.slice(0, 6).map(personRow).join('')}</div></div>`;
   }
-  const tr = D.tracks.filter(t => (t.title + ' ' + t.artist + ' ' + t.genre).toLowerCase().includes(q));
+  const tr = allTracks().filter(t => (t.title + ' ' + t.artist + ' ' + t.genre).toLowerCase().includes(q));
   const ppl = people.filter(u => (u.name + ' ' + u.handle).toLowerCase().includes(q));
   const tags = allTags().filter(([t]) => t.includes(q));
   let h = '';
@@ -275,7 +277,7 @@ OV.community = {
   kind: 'screen', label: 'Communauté',
   html: o => { const k = comm(o.id);
     return head(esc(k.name), moreBtn('comm', k.id)) +
-    `<div class="chat-body" id="chatBody" style="display:flex;flex-direction:column;gap:12px"><div class="cbanner" style="background:${k.color}">${shapeHTML(k.shape)}<span class="gtag" style="font-size:13px">${fmtN(k.members)} MEMBRES</span></div><p class="t2" style="font-size:14px">${esc(k.desc)}</p>${k.joined ? '' : `<button class="btn primary" data-a="join" data-id="${k.id}">Rejoindre la communauté</button>`}<div id="commPosts" style="display:flex;flex-direction:column;gap:10px">${k.posts.map(p => cpostHTML(k, p)).join('')}</div></div>
+    `<div class="chat-body" id="chatBody" style="display:flex;flex-direction:column;gap:12px"><div class="cbanner" style="background:${k.color}">${shapeHTML(k.shape)}<span class="gtag" style="font-size:13px">${fmtN(k.members)} MEMBRE${k.members > 1 ? 'S' : ''}</span></div><p class="t2" style="font-size:14px">${esc(k.desc)}</p>${k.joined ? '' : `<button class="btn primary" data-a="join" data-id="${k.id}">Rejoindre la communauté</button>`}<div id="commPosts" style="display:flex;flex-direction:column;gap:10px">${k.posts.map(p => cpostHTML(k, p)).join('')}</div></div>
     ${k.joined ? `<form class="composer glass strong lens" data-form="cpost" data-id="${k.id}"><button type="button" class="icon-btn sm" data-a="shareNowComm" data-id="${k.id}" aria-label="Partager le son en cours">${ic('music', 20)}</button><label class="sr" for="cpIn">Écrire dans la communauté</label><input id="cpIn" placeholder="Écrire à la communauté…" autocomplete="off" enterkeyhint="send" maxlength="1000"><button class="send" type="submit" aria-label="Publier">${ic('send', 20)}</button></form>` : ''}`; },
   after: () => { const b = $('#chatBody'); if (b) b.scrollTop = b.scrollHeight; },
   onClose: () => { if (U.tab === 'chat') setTimeout(() => { if (!hasScreen()) renderView(); }, 0); },
@@ -392,8 +394,9 @@ OV.trackEdit = {
       <label class="te-art" aria-label="Choisir l’image du son">${cover(t, 112, 16)}<span class="cam glass tint">${ic('camera', 18)}</span><input type="file" accept="image/*" class="sr" data-ch="trackArt" data-id="${t.id}"></label>
       <div class="field"><label for="teTitle">Titre</label><input id="teTitle" class="glass" maxlength="60" value="${esc(t.title)}"></div>
       <div class="field"><label for="teArtist">Artiste</label><input id="teArtist" class="glass" maxlength="40" value="${esc(t.artist)}"></div>
-      <p class="t3" style="font-size:12px;line-height:1.45">${fmt(t.dur)} · gardé sur cet appareil. Publie uniquement des sons dont tu as les droits.</p>
+      <p class="t3" style="font-size:12px;line-height:1.45">${fmt(t.dur)} · ${t.cloudId ? 'publié sur Musio : tout le monde peut l’écouter.' : 'gardé sur cet appareil.'} Publie uniquement des sons dont tu as les droits.</p>
       <div class="btn-row"><button type="button" class="btn glass" data-a="playTrack" data-id="${t.id}" data-q="${t.id}" data-src="Mes sons">${icf('play', 16)}Écouter</button><button type="submit" class="btn primary">Enregistrer</button></div>
+      ${typeof publishBtnHTML === 'function' ? publishBtnHTML(t) : ''}
       <button type="button" class="btn glass danger-t" data-a="delTrack" data-id="${t.id}">${ic('trash', 16)}Supprimer ce son</button>
     </form>`; },
 };

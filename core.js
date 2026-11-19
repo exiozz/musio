@@ -164,8 +164,9 @@ function save() {
 }
 
 // ---------- recherches ----------
-const T = id => D.tracks.find(t => t.id === id) || (S && S.myTracks || []).find(t => t.id === id);
-const allTracks = () => (S.myTracks || []).concat(D.tracks);
+// sons : catalogue + tes sons + sons publiés en ligne par les membres (window.CLOUD_TRACKS)
+const T = id => D.tracks.find(t => t.id === id) || (S && S.myTracks || []).find(t => t.id === id) || (window.CLOUD_TRACKS || []).find(t => t.id === id);
+const allTracks = () => (S.myTracks || []).concat(window.CLOUD_TRACKS || [], D.tracks);
 // Les fichiers audio importés sont gardés dans IndexedDB (trop lourds pour localStorage)
 window.AUDIO_SRC = {};
 const IDB = (() => {
@@ -190,7 +191,9 @@ function PL(id) {
   return S.playlists.find(p => p.id === id) || D.playlists.find(p => p.id === id) || D.mixes.find(m => m.id === id);
 }
 const conv = id => S.convs.find(c => c.id === id);
-const comm = id => S.communities.find(k => k.id === id);
+// communautés : en ligne (window.CLOUD_COMMS) quand les comptes sont actifs, sinon sur l'appareil
+const allComms = () => window.CLOUD_COMMS || S.communities;
+const comm = id => allComms().find(k => k.id === id);
 const post = id => S.posts.find(p => p.id === id);
 
 // ---------- fragments ----------
@@ -212,7 +215,7 @@ const REACTS = { fire: ['🔥', 'pulse'], cry: ['😭', 'wobble'], casque: ['�
 const reactHTML = (k, big) => { const r = REACTS[k]; return r ? `<span class="rx rx-${r[1]} ${r[2] ? 'rx-word' : ''} ${big ? 'big' : ''}" aria-hidden="true"><span>${r[0]}</span></span>` : ''; };
 const echoCount = p => Math.round(p.shares * 0.6) + 3 + S.echoes.filter(e => e.post === p.id).length;
 const myEcho = id => S.echoes.find(e => e.post === id && e.by === 'me');
-const artOf = o => o && o.id && S.trackArt && S.trackArt[o.id];
+const artOf = o => o && (o.art || (o.id && S.trackArt && S.trackArt[o.id]));
 const cover = (o, s = 48, r = 12, inner = '') => { const a = artOf(o); return `<span class="cover${a ? ' has-art' : ''}" style="width:${s}px;height:${s}px;border-radius:${r}px;background:${o.color}" aria-hidden="true">${a ? `<img class="art" src="${a}" alt="">` : shapeHTML(o.shape) + ring2(o.c2)}${inner}</span>`; };
 const eqHTML = (on = true) => `<span class="eq ${on ? '' : 'off'}" aria-hidden="true"><i></i><i></i><i></i></span>`;
 // badge « Créateur de Musio » : uniquement pour les comptes qui ont le rôle « creator »

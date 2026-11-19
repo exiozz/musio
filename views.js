@@ -126,6 +126,7 @@ function viewMusic() {
     ${hero}
     <div class="chips">${['Tout'].concat(GENRES).map(x => `<button class="chip glass ${x === g ? 'on' : ''}" data-a="genre" data-id="${x}" aria-pressed="${x === g}">${x}</button>`).join('')}</div>
     ${mixes.length ? `<div class="sec-h"><h2>Pour toi</h2><span class="t3" style="font-size:13px">${mixes.length} mix</span></div><div class="hscroll">${mixes.map(mx => `<button class="mixcard big" data-a="openPlaylist" data-id="${mx.id}">${cover(mx, 168, 28, `<span class="gtag">${mx.tag}</span>`)}<b>${esc(mx.title)}</b><small>${esc(mx.sub)}</small></button>`).join('')}</div>` : ''}
+    ${typeof cloudTracksHTML === 'function' ? cloudTracksHTML() : ''}
     <h2>Reprendre</h2>
     <div class="tiles">${tiles.concat(S.playlists).map(pl => `<button class="tile glass" data-a="openPlaylist" data-id="${pl.id}">${cover(pl, 46, 14)}<span>${esc(pl.title)}</span></button>`).join('')}<button class="tile glass add" data-a="newPlaylist">${`<span class="tile-plus">${ic('plus', 22)}</span>`}<span>Nouvelle playlist</span></button></div>
     <div class="sec-h"><h2>${g === 'Tout' ? 'Nouveautés' : 'Titres ' + esc(g)}</h2><button class="chip glass" data-a="playList" data-q="${tr.map(x => x.id).join(',')}" data-src="Nouveautés">${icf('play', 14)}Tout lire</button></div>
@@ -310,10 +311,12 @@ function chatListHTML() {
     const convs = S.convs.filter(c => !blocked(c.with) && (!q || user(c.with).name.toLowerCase().includes(q))).sort((a, b) => lastAt(b) - lastAt(a));
     return convs.length ? `<div class="panel glass"><div class="list">${convs.map(convRow).join('')}</div></div>` : `<div class="empty">${ic('chat', 36)}<span>Aucune conversation${q ? ' pour « ' + esc(U.chatQ) + ' »' : ''}.</span></div>`;
   }
-  const ks = S.communities.filter(k => !q || k.name.toLowerCase().includes(q));
+  const ks = allComms().filter(k => !q || k.name.toLowerCase().includes(q));
+  const create = `<button class="imp-card glass strong" data-a="newComm">${ic('plus', 22)}<span class="grow tt"><b>Créer une communauté</b><small>Autour d’un genre, d’un artiste, d’une ville…</small></span>${ic('chevron', 20)}</button>`;
+  if (!ks.length) return create + `<div class="empty">${ic('users', 36)}<span>${q ? 'Aucune communauté pour « ' + esc(U.chatQ) + ' ».' : window.CLOUD_COMMS === undefined || window.CLOUD_COMMS ? 'Aucune communauté pour l’instant. Crée la première !' : 'Chargement…'}</span></div>`;
   const joined = ks.filter(k => k.joined), other = ks.filter(k => !k.joined);
-  return `${joined.length ? `<p class="result-h">Tes communautés</p><div class="panel glass"><div class="list">${joined.map(k => { const lp = k.posts[k.posts.length - 1]; return `<button class="conv" data-a="openCommunity" data-id="${k.id}">${cover(k, 52, 18)}<span class="grow"><b>${esc(k.name)}</b><small>${lp ? esc((lp.me ? 'Toi' : lp.user) + ' : ' + (lp.text || 'a partagé un son')) : ''}</small></span><span class="meta">${fmtN(k.members)}</span></button>`; }).join('')}</div></div>` : ''}
-    ${other.length ? `<p class="result-h">À découvrir</p><div class="ccards">${other.map(k => `<div class="ccard glass"><button class="ccard-main" data-a="openCommunity" data-id="${k.id}">${cover(k, 300, 22)}<b>${esc(k.name)}</b><small>${fmtN(k.members)} membres</small></button><button class="btn primary" style="height:38px" data-a="join" data-id="${k.id}">Rejoindre</button></div>`).join('')}</div>` : ''}`;
+  return `${create}${joined.length ? `<p class="result-h">Tes communautés</p><div class="panel glass"><div class="list">${joined.map(k => { const lp = k.posts[k.posts.length - 1]; return `<button class="conv" data-a="openCommunity" data-id="${k.id}">${cover(k, 52, 18)}<span class="grow"><b>${esc(k.name)}</b><small>${lp ? esc((lp.me ? 'Toi' : lp.user) + ' : ' + (lp.text || 'a partagé un son')) : ''}</small></span><span class="meta">${fmtN(k.members)}</span></button>`; }).join('')}</div></div>` : ''}
+    ${other.length ? `<p class="result-h">À découvrir</p><div class="ccards">${other.map(k => `<div class="ccard glass"><button class="ccard-main" data-a="openCommunity" data-id="${k.id}">${cover(k, 300, 22)}<b>${esc(k.name)}</b><small>${fmtN(k.members)} membre${k.members > 1 ? 's' : ''}</small></button><button class="btn primary" style="height:38px" data-a="join" data-id="${k.id}">Rejoindre</button></div>`).join('')}</div>` : ''}`;
 }
 VIEWS.chat = () => {
   const live = FRIENDS.filter(f => f.live && !blocked(f.id));
