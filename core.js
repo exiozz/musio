@@ -165,7 +165,7 @@ function save() {
 
 // ---------- recherches ----------
 // sons : catalogue + tes sons + sons publiés en ligne par les membres (window.CLOUD_TRACKS)
-const T = id => D.tracks.find(t => t.id === id) || (S && S.myTracks || []).find(t => t.id === id) || (window.CLOUD_TRACKS || []).find(t => t.id === id);
+const T = id => D.tracks.find(t => t.id === id) || (S && S.myTracks || []).find(t => t.id === id) || (window.CLOUD_TRACKS || []).find(t => t.id === id) || (window.PRESENCE_TRACKS || {})[id];
 const allTracks = () => (S.myTracks || []).concat(window.CLOUD_TRACKS || [], D.tracks);
 // Les fichiers audio importés sont gardés dans IndexedDB (trop lourds pour localStorage)
 window.AUDIO_SRC = {};
@@ -286,6 +286,7 @@ function unlock() {
 }
 function playTrack(id, o = {}) {
   const t = T(id); if (!t) return;
+  if (t.synthetic) { toast(t.title === 'Rien en écoute' ? 'Rien en écoute pour l’instant' : `« ${t.title} » n’est pas sur Musio : impossible de l’écouter ici`, ic('info', 20)); return; }
   if (!U.unlocked) unlock();
   if (o.queue) { P.queue = o.queue.slice(); P.qi = Math.max(0, P.queue.indexOf(id)); }
   else if (!P.queue.includes(id)) { P.queue = [id]; P.qi = 0; } else P.qi = P.queue.indexOf(id);
