@@ -178,7 +178,7 @@ function allTags() { const m = {}; S.posts.forEach(p => (p.caption.match(/#([\w�
 function personRow(u) { const fol = S.followed.includes(u.id); return `<div class="li"><button class="grow row" data-a="openProfile" data-id="${u.id}">${avatar(u, 44)}<span class="tt"><b style="display:flex;align-items:center">${esc(u.name)}${verified(u)}</b><small>@${esc(u.handle)}</small></span></button><button class="btn ${fol ? 'glass' : 'primary'}" style="height:36px;padding:0 14px" data-a="follow" data-id="${u.id}" aria-pressed="${fol}">${fol ? 'Abonné·e' : 'Suivre'}</button></div>`; }
 function searchResults() {
   const q = U.search.q.trim().toLowerCase().replace(/^[@#]/, ''), tab = U.search.tab;
-  const people = FRIENDS.concat(D.others).filter(u => !blocked(u.id));
+  const seen = new Set(), people = FRIENDS.concat(Object.values(window.CLOUD_PEOPLE || {}), D.others).filter(u => !blocked(u.id) && u.id !== (S && S.uid) && !seen.has(u.id) && seen.add(u.id));
   if (!q) {
     return `${S.recent.length ? `<div class="sec-h"><p class="result-h">Récent</p><button class="t2" style="font-size:13px" data-a="clearRecent">Effacer</button></div><div class="chips wrap">${S.recent.map(r => `<button class="chip glass" data-a="recent" data-id="${esc(r)}">${esc(r)}</button>`).join('')}</div>` : ''}
       <p class="result-h">Tendances</p><div class="chips wrap">${allTags().slice(0, 8).map(([t]) => `<button class="chip glass" data-a="tag" data-id="${esc(t)}">#${esc(t)}</button>`).join('')}</div>
@@ -203,6 +203,7 @@ OV.postView = {
 
 // ---------- ABONNÉS / ABONNEMENTS ----------
 function followData(id) {
+  if (typeof cloudFollowData === 'function') { const c = cloudFollowData(id); if (c) return c; }
   // uniquement des liens réels (aucun abonné inventé)
   if (id === 'me') { const following = S.followed.map(user).filter(u => !blocked(u.id)); return { followers: [], following, followersTotal: S.me.followers || 0, followingTotal: following.length }; }
   const followers = S.followed.includes(id) ? [user('me')] : [], following = [];

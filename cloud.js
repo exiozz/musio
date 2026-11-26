@@ -230,6 +230,79 @@ A.unpublishCloud = el => {
 };
 
 // ---------- branchement ----------
+// ---------- personnes et abonnements en ligne ----------
+// window.CLOUD_PEOPLE : profils des membres (id → personne), FOL : qui suit qui (par profil ouvert)
+window.CLOUD_PEOPLE = {};
+const FOL = {};
+const toPerson = r => ({ id: r.id, name: r.name, handle: r.handle, color: r.color || '#9B85FF', bio: r.bio || '', creator: r.role === 'creator', cloud: true });
+const PEOPLE_COLS = 'id,name,handle,bio,color,role';
+function addPeople(rows) { (rows || []).forEach(r => { if (r && r.id && r.id !== uidMe()) window.CLOUD_PEOPLE[r.id] = toPerson(r); }); }
+const isCloudId = id => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(String(id));
+function refreshPeople() { ['profile', 'follows'].forEach(refreshOv); const r = $('#results'); if (r && U.ov.some(o => o.type === 'search')) r.innerHTML = searchResults(); if (!hasScreen() && U.tab === 'account') renderView(); }
+async function loadPeople() {
+  if (!SB || !uidMe()) return;
+  const { data, error } = await SB.from('profiles').select(PEOPLE_COLS).neq('id', uidMe()).order('created_at', { ascending: false }).limit(100);
+  if (!error) addPeople(data);
+  await loadMyFollows();
+  refreshPeople();
+}
+// mes abonnements en ligne → S.followed (on garde les éventuels abonnements locaux)
+async function loadMyFollows() {
+  const me = uidMe(); if (!me) return;
+  const [a, b] = await Promise.all([
+    SB.from('follows').select('followee_id').eq('follower_id', me),
+    SB.from('follows').select('follower_id', { count: 'exact', head: true }).eq('followee_id', me),
+  ]);
+  if (!a.error) {
+    const ids = (a.data || []).map(r => r.followee_id);
+    S.followed = S.followed.filter(id => !isCloudId(id)).concat(ids);
+    const miss = ids.filter(id => !window.CLOUD_PEOPLE[id]);
+    if (miss.length) { const { data } = await SB.from('profiles').select(PEOPLE_COLS).in('id', miss); addPeople(data); }
+  }
+  if (!b.error) S.me.followers = b.count || 0;
+  save();
+}
+let peopleQT = 0, peopleQ = '';
+function searchPeople(q) {
+  q = (q || '').trim().replace(/^@/, '').replace(/[%_,()]/g, '');
+  clearTimeout(peopleQT);
+  if (!SB || !uidMe() || q.length < 1 || q === peopleQ) return;
+  peopleQT = setTimeout(async () => {
+    peopleQ = q;
+    const { data, error } = await SB.from('profiles').select(PEOPLE_COLS).or(`name.ilike.%${q}%,handle.ilike.%${q.toLowerCase()}%`).neq('id', uidMe()).limit(30);
+    if (!error) { addPeople(data); refreshPeople(); }
+  }, 250);
+}
+// abonnés / abonnements d'un profil en ligne (et du mien)
+async function loadFollowInfo(id) {
+  const uid = id === 'me' ? uidMe() : id; if (!SB || !uid || !isCloudId(uid)) return;
+  const [a, b] = await Promise.all([
+    SB.from('follows').select('follower_id').eq('followee_id', uid).order('created_at', { ascending: false }).limit(500),
+    SB.from('follows').select('followee_id').eq('follower_id', uid).order('created_at', { ascending: false }).limit(500),
+  ]);
+  if (a.error || b.error) return;
+  const followers = a.data.map(r => r.follower_id), following = b.data.map(r => r.followee_id);
+  const miss = followers.concat(following, id === 'me' ? [] : [uid]).filter(x => x !== uidMe() && !window.CLOUD_PEOPLE[x]);
+  if (miss.length) { const { data } = await SB.from('profiles').select(PEOPLE_COLS).in('id', Array.from(new Set(miss))); addPeople(data); }
+  FOL[uid] = { followers, following };
+  if (id === 'me') S.me.followers = followers.length;
+  refreshPeople();
+}
+const asUser = x => x === uidMe() ? user('me') : user(x);
+function cloudFollowData(id) {
+  const uid = id === 'me' ? uidMe() : id; if (!uid || !isCloudId(uid)) return null;
+  const f = FOL[uid];
+  if (id === 'me') {
+    const following = S.followed.map(user).filter(u => !blocked(u.id));
+    const followers = f ? f.followers.map(asUser).filter(u => !blocked(u.id)) : [];
+    return { followers, following, followersTotal: f ? f.followers.length : (S.me.followers || 0), followingTotal: following.length };
+  }
+  if (!f) return { followers: S.followed.includes(id) ? [user('me')] : [], following: [], followersTotal: 0, followingTotal: 0 };
+  // le profil ajoute lui-même +1 si je suis abonné : on ne me compte pas ici
+  const others = f.followers.filter(x => x !== uidMe());
+  return { followers: (S.followed.includes(id) ? [user('me')] : []).concat(others.map(asUser).filter(u => !blocked(u.id))), following: f.following.map(asUser).filter(u => !blocked(u.id)), followersTotal: others.length, followingTotal: f.following.length };
+}
+
 function bootCloud() {
   if (!SB) return;
   window.CLOUD_COMMS = null; window.CLOUD_TRACKS = [];
@@ -274,6 +347,27 @@ function bootCloud() {
   A.tab = el => { baseTab(el); if (el.dataset.id === 'chat') loadComms(); if (el.dataset.id === 'feed') loadTracks(); };
   const baseFeedMode = A.feedMode;
   A.feedMode = el => { baseFeedMode(el); if (U.feedMode === 'music') loadTracks(); };
+  // abonnements réels
+  const baseFollow = A.follow;
+  A.follow = async el => {
+    const id = el.dataset.id;
+    if (!isCloudId(id) || !uidMe()) return baseFollow(el);
+    const was = S.followed.includes(id);
+    const res = was
+      ? await SB.from('follows').delete().eq('follower_id', uidMe()).eq('followee_id', id)
+      : await SB.from('follows').insert({ follower_id: uidMe(), followee_id: id });
+    if (res.error && !/duplicate/.test(res.error.message)) { toast(cloudErr(res.error), ic('info', 20)); return; }
+    baseFollow(el);
+    const f = FOL[id]; if (f) { f.followers = f.followers.filter(x => x !== uidMe()); if (!was) f.followers.unshift(uidMe()); }
+  };
+  const baseOpenProfile = A.openProfile;
+  A.openProfile = el => { baseOpenProfile(el); loadFollowInfo(el.dataset.id); };
+  const baseFollowList = A.followList;
+  A.followList = el => { baseFollowList(el); loadFollowInfo(el.dataset.id); };
+  const baseSearch = A.search;
+  A.search = () => { baseSearch(); loadPeople(); };
+  const baseIn = IN.search;
+  IN.search = el => { baseIn(el); searchPeople(el.value); };
 }
 // appelé une fois le compte connecté
-function cloudSignedIn() { if (!SB) return; loadComms(true); loadTracks(true); if (typeof adminSignedIn === 'function') adminSignedIn(); }
+function cloudSignedIn() { if (!SB) return; window.CLOUD_PEOPLE = {}; Object.keys(FOL).forEach(k => delete FOL[k]); peopleQ = ''; loadComms(true); loadTracks(true); loadPeople(); if (typeof adminSignedIn === 'function') adminSignedIn(); }

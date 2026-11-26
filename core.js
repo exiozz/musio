@@ -183,7 +183,7 @@ function totals(id) {
 }
 function user(id) {
   if (id === 'me') return { id: 'me', name: S.me.name, handle: S.me.handle, color: S.me.color, bio: S.me.bio, photo: S.me.photo, me: true };
-  return FRIENDS.find(f => f.id === id) || D.others.find(u => u.id === id) || D.profiles.find(p => p.id === id) || { id, name: String(id), handle: String(id), color: '#9B85FF' };
+  return FRIENDS.find(f => f.id === id) || (window.CLOUD_PEOPLE && window.CLOUD_PEOPLE[id]) || D.others.find(u => u.id === id) || D.profiles.find(p => p.id === id) || { id, name: String(id), handle: String(id), color: '#9B85FF' };
 }
 function nameUser(name, mine) { if (mine) return user('me'); return FRIENDS.find(f => f.name === name) || D.profiles.find(p => p.name === name) || { name, color: PALETTE[hashN(name) % PALETTE.length] }; }
 function PL(id) {
@@ -221,7 +221,7 @@ const eqHTML = (on = true) => `<span class="eq ${on ? '' : 'off'}" aria-hidden="
 // badge « Créateur de Musio » : uniquement pour les comptes qui ont le rôle « creator »
 const isCreator = () => !!(S && S.me && S.me.role === 'creator');
 const cBadge = (s = 16) => `<svg class="vbadge cbadge" width="${s}" height="${s}" viewBox="0 0 24 24" role="img" aria-label="Créateur de Musio"><path d="${ROSETTE}" fill="url(#cgrad)"/><path d="M5.6 13.4c1.5-3.2 3-3.2 4.3 0s2.9 3.2 4.3 0 2.9-3.2 4.2 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M12 4.6l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 6.7l2-.3z" fill="#fff"/></svg>`;
-const verified = u => u && (u.id === 'me' || u.me) ? (isCreator() ? cBadge(16) : '') : u && u.verified ? vBadge(16) : '';
+const verified = u => u && (u.id === 'me' || u.me) ? (isCreator() ? cBadge(16) : '') : u && u.creator ? cBadge(16) : u && u.verified ? vBadge(16) : '';
 const devIcon = () => ({ 'Ce téléphone': 'phone', 'Cet ordinateur': 'laptop', 'Casque sans fil': 'headphones', 'Enceinte du salon': 'speaker', 'Voiture': 'car' }[S.settings.device] || 'phone');
 function getK(key) { const [root, k] = key.split('.'); const o = { settings: S.settings, notif: S.settings.notif, consents: S.consents, create: U.create, ob: U.ob }[root]; return o ? o[k] : undefined; }
 function setK(key, v) { const [root, k] = key.split('.'); const o = { settings: S.settings, notif: S.settings.notif, consents: S.consents, create: U.create, ob: U.ob }[root]; if (o) o[k] = v; }
