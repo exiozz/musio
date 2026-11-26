@@ -1,6 +1,6 @@
 // Musio — service worker : l'app s'ouvre même sans connexion.
 // Change VERSION à chaque mise en ligne pour forcer le rafraîchissement du cache.
-const VERSION = 'musio-v12';
+const VERSION = 'musio-v13';
 const SHELL = [
   './', 'index.html', 'styles.css',
   'data.js', 'audio.js', 'legal.js', 'core.js', 'views.js', 'overlays.js', 'actions.js',
@@ -9,7 +9,8 @@ const SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' : on ignore le cache HTTP du navigateur pour ne pas remettre d'anciens fichiers
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -35,7 +36,16 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Fichiers et polices : réponse immédiate depuis le cache, mise à jour en arrière-plan
+  // Code de l'appli (js, css, html, manifeste) : réseau d'abord pour toujours avoir la dernière version,
+  // cache seulement hors ligne. Images et polices : cache d'abord.
+  const isCode = sameOrigin && /\.(js|css|html|webmanifest)$|\/$/.test(url.pathname) && !/\/vendor\//.test(url.pathname);
+  if (isCode) {
+    e.respondWith(fetch(new Request(req, { cache: 'no-cache' })).then(res => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req)));
+    return;
+  }
   e.respondWith(caches.open(VERSION).then(async cache => {
     const hit = await cache.match(req);
     const net = fetch(req).then(res => {

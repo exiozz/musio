@@ -56,7 +56,10 @@
 <script>
 // installation hors ligne (ignorée là où les service workers ne sont pas permis)
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-  window.addEventListener('load', () => { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} });
+  window.addEventListener('load', () => { try { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {}); } catch (e) {} });
+  // nouvelle version installée : on recharge une fois pour l'utiliser tout de suite
+  let reloaded = false, hadCtrl = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCtrl && !reloaded) { reloaded = true; location.reload(); } hadCtrl = true; });
 }
 </script>
 </body>
