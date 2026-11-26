@@ -342,12 +342,13 @@ async function pullPresence() {
   FRIENDS = FRIENDS.filter(f => !f.cloudFriend).concat(fr);
   if (U.tab === 'map' && !hasScreen()) { if (typeof syncMarkers === 'function') syncMarkers(); const d = $('.dock'); if (d) renderView(); }
 }
-function mapTick() { pushPresence().then(pullPresence).catch(() => {}); }
+function mapTick() { pushPresence().then(pullPresence).catch(() => {}); loadFeedPosts(); }
 function startMapSync() { clearTimeout(MAPC.timer); mapTick(); const loop = () => { MAPC.timer = setTimeout(() => { if (!document.hidden) mapTick(); loop(); }, U.tab === 'map' ? 20000 : 60000); }; loop(); }
 
 // ---------- publications du feed en ligne ----------
 window.CLOUD_POSTS = [];
 const POSTC = { at: 0 };
+const newUUID = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, ch => { const r = (crypto.getRandomValues(new Uint8Array(1))[0] & 15); return (ch === 'x' ? r : (r & 3) | 8).toString(16); });
 const okColor = c => /^#[0-9A-Fa-f]{6}$/.test(c || '') ? c : null;
 function postTrack(r) {
   const t = r.track_id && T(r.track_id);
@@ -376,14 +377,16 @@ async function loadFeedPosts(force) {
   const { data, error } = await SB.from('posts').select('*,author:profiles(' + PEOPLE_COLS + ')').order('created_at', { ascending: false }).limit(200);
   if (error) { POSTC.at = 0; return; }
   const local = new Set(S.posts.map(p => p.cloudId).filter(Boolean));
+  const before = (window.CLOUD_POSTS || []).map(p => p.id).join();
   window.CLOUD_POSTS = (data || []).filter(r => !local.has(r.id)).map(toPost);
-  if (!hasScreen() && (U.tab === 'feed' || U.tab === 'account') && !U.activePost) renderView();
+  // on ne redessine que s'il y a du nouveau (pour ne pas couper la vidéo en cours)
+  if (before !== window.CLOUD_POSTS.map(p => p.id).join() && !hasScreen() && (U.tab === 'feed' || U.tab === 'account')) renderView();
   ['profile', 'tag'].forEach(refreshOv);
 }
 const dataToBlob = d => fetch(d).then(r => r.blob());
 const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
 async function uploadPost(p, file) {
-  const me = uidMe(), id = (crypto.randomUUID ? crypto.randomUUID() : null); if (!me || !id) return;
+  const me = uidMe(), id = newUUID(); if (!me) return;
   toast('Envoi de ta publication…', ic('upload', 20));
   try {
     let video_path = null, photo_paths = [];
