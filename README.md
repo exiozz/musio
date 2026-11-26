@@ -48,6 +48,7 @@ Le schéma de la base est dans `supabase/migrations/` (comptes, communautés, so
 - `communities`, `community_members`, `community_posts` : 10 communautés max par personne, il faut être membre pour écrire
 - `tracks` + buckets `sounds` / `covers` : chacun dépose ses fichiers dans son dossier, 20 Mo et 100 sons max par compte, droits certifiés
 - `reports`, `boosts`, `admin_stats`, `admin_ban` (005) : signalements en ligne, mise en avant pendant une durée, suspension de comptes
+- `follows` (006) : abonnements en ligne (qui suit qui), visibles par les membres connectés
 
 Vide `config.js` pour faire tourner Musio sans comptes en ligne (mode local).
 

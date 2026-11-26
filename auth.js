@@ -102,6 +102,7 @@ function authErr(e) {
   if (/rate limit|too many|only request this after|security purposes/.test(m)) return 'Trop d’essais. Patiente un peu avant de réessayer.';
   if (/unable to validate email|invalid email|email address .* is invalid/.test(m)) return 'Cette adresse e-mail n’est pas valide.';
   if (/duplicate key|profiles_handle_key|23505/.test(m)) return 'Ce nom d’utilisateur est déjà pris.';
+  if (/profiles_handle_zeros/.test(m)) return 'Ce nom d’utilisateur n’est pas autorisé (pas de @00).';
   if (/profiles_handle_check/.test(m)) return 'Nom d’utilisateur : 2 à 24 caractères, lettres minuscules, chiffres, points ou tirets bas.';
   if (/failed to fetch|network|load failed|fetch/.test(m)) return 'Connexion impossible. Vérifie ta connexion Internet.';
   return (e && e.message) || 'Une erreur est survenue. Réessaie.';
@@ -244,6 +245,7 @@ async function cloudFinish() {
   const o = obState(); if (o.busy) return;
   if (!AUTH.user) { obSet({ step: 'login', err: 'Ta session a expiré : reconnecte-toi.' }); return; }
   const name = o.name.trim().slice(0, 30), handle = cleanHandle(o.handle, o.name);
+  if (/^0+$/.test(handle)) { obSet({ step: 1, handle }); toast('@' + handle + ' n’est pas autorisé : choisis un autre nom d’utilisateur', ic('info', 20)); return; }
   obSet({ busy: true });
   const { data: free, error: e1 } = await SB.rpc('handle_available', { h: handle });
   if (e1) { obSet({ busy: false }); toast(authErr(e1), ic('info', 20)); return; }
