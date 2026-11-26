@@ -204,7 +204,7 @@ A.zoom = el => mapZoom(+el.dataset.id);
 A.recenter = () => { if (GEO.pos) mapFlyTo(GEO.pos.lng, GEO.pos.lat); else locateMe(); };
 A.locate = () => locateMe();
 A.friend = el => { if (U.mapMoved && Date.now() - U.mapMoved < 300) return; const f = FRIENDS.find(x => x.id === el.dataset.id); if (U.tab === 'map' && $('#map') && isFinite(f.lat)) mapFlyTo(f.lng, f.lat, isDesk() ? 0 : 120); push('friend', { id: f.id }); };
-A.listenWith = el => { const f = FRIENDS.find(x => x.id === el.dataset.id); playTrack(f.trackId, { queue: [f.trackId], at: 20 + hashN(f.id) % 60, source: 'Avec ' + f.name }); if (topOv() && OV[topOv().type].kind === 'sheet') pop(); toast(`Tu écoutes avec ${f.name}`, avatar(f, 30)); };
+A.listenWith = el => { const f = FRIENDS.find(x => x.id === el.dataset.id); if (T(f.trackId) && T(f.trackId).synthetic) { playTrack(f.trackId); return; } playTrack(f.trackId, { queue: [f.trackId], at: 20 + hashN(f.id) % 60, source: 'Avec ' + f.name }); if (topOv() && OV[topOv().type].kind === 'sheet') pop(); toast(`Tu écoutes avec ${f.name}`, avatar(f, 30)); };
 A.openChatWith = el => openChatWith(el.dataset.id);
 // match
 A.matchMode = el => { U.matchMode = el.dataset.id; if (U.matchMode === 'matches') S.match.newCount = 0; save(); renderView(); renderChrome(); };

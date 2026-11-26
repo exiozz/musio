@@ -244,7 +244,7 @@ OV.profile = {
     const t = fr ? T(fr.trackId) : prof ? T(prof.anthem) : null;
     const at = u.artist ? D.tracks.filter(x => x.artist.indexOf(u.artist) === 0) : [];
     const fd = followData(o.id), followers = fd.followersTotal, following = fd.followingTotal;
-    const bio = u.bio || (prof && prof.bio) || (fr ? `Écoute surtout du ${T(fr.trackId).genre.toLowerCase()}. ${fr.place}.` : '');
+    const bio = u.bio || (prof && prof.bio) || (fr && fr.place ? `Écoute surtout du ${T(fr.trackId).genre.toLowerCase()}. ${fr.place}.` : '');
     return head('@' + esc(u.handle || u.name), moreBtn('user', o.id)) + `<div class="scroll">
       <div class="prof glass strong">${avatar(u, 96)}<div><h2 style="font-size:24px">${esc(u.name)}${prof ? ', ' + prof.age : ''}${verified(u)}${prof && prof.private ? `<span class="privtag" style="margin-left:6px">${ic('lock', 12)}Privé</span>` : ''}</h2><div class="handle">${u.handle ? '@' + esc(u.handle) : prof ? prof.compat + ' % de compatibilité · à ' + distTxt(prof.dist) : ''}</div></div>${bio ? `<p class="bio">${esc(bio)}</p>` : ''}
         ${isB ? `<p class="t2">Tu as bloqué ce compte.</p><button class="btn glass" data-a="unblock" data-id="${o.id}">Débloquer</button>` : `${statsHTML(o.id, followers + (fol ? 1 : 0), following, locked)}<button class="visit-chip ${S.settings.showMyVisits ? '' : 'off'}" data-a="toggleVisits">${ic(S.settings.showMyVisits ? 'eye' : 'eyeoff', 14)}${S.settings.showMyVisits ? `${esc(u.name)} peut voir ta visite` : 'Visite discrète'}</button>

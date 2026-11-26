@@ -303,6 +303,48 @@ function cloudFollowData(id) {
   return { followers: (S.followed.includes(id) ? [user('me')] : []).concat(others.map(asUser).filter(u => !blocked(u.id))), following: f.following.map(asUser).filter(u => !blocked(u.id)), followersTotal: others.length, followingTotal: f.following.length };
 }
 
+// ---------- Map en ligne : ma position (arrondie) + celles des gens qui me suivent ----------
+window.PRESENCE_TRACKS = {};
+const MAPC = { timer: 0, sent: false, last: '' };
+function presenceTrack(r) {
+  if (r.track_id && T(r.track_id) && !T(r.track_id).synthetic) return r.track_id;
+  const id = 'pz-' + r.user_id;
+  window.PRESENCE_TRACKS[id] = { id, title: r.track_title || 'Rien en écoute', artist: r.track_artist || '', genre: 'Musique', color: r.track_color || '#9B85FF', shape: 'disc', dur: 180, synthetic: true };
+  return id;
+}
+async function pushPresence(force) {
+  const me = uidMe(); if (!SB || !me) return;
+  const share = S.settings.shareListening && S.geo && S.geo.on && isFinite(S.geo.lat) && isFinite(S.geo.lng);
+  if (!share) { if (MAPC.sent || force) { await SB.from('presence').delete().eq('user_id', me); MAPC.sent = false; MAPC.last = ''; } return; }
+  const t = T(P.trackId), playing = !!(t && E.isPlaying());
+  const row = { user_id: me, lat: S.geo.lat, lng: S.geo.lng, playing,
+    track_id: t ? String(t.cloudId ? t.id : t.id).slice(0, 60) : null,
+    track_title: t ? String(t.title).slice(0, 80) : null, track_artist: t ? String(t.artist || '').slice(0, 60) : null,
+    track_color: t && /^#[0-9A-Fa-f]{6}$/.test(t.color || '') ? t.color : null };
+  const key = JSON.stringify(row);
+  // on renvoie au moins toutes les 2 min pour rester « en direct »
+  if (!force && key === MAPC.last && Date.now() - (MAPC.at || 0) < 120000) return;
+  const { error } = await SB.from('presence').upsert(row);
+  if (!error) { MAPC.sent = true; MAPC.last = key; MAPC.at = Date.now(); }
+}
+async function pullPresence() {
+  const me = uidMe(); if (!SB || !me) return;
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { data, error } = await SB.from('presence').select('*').neq('user_id', me).gte('updated_at', since).limit(300);
+  if (error) return;
+  const miss = (data || []).map(r => r.user_id).filter(id => !window.CLOUD_PEOPLE[id]);
+  if (miss.length) { const r = await SB.from('profiles').select(PEOPLE_COLS).in('id', miss); addPeople(r.data); }
+  const now = Date.now();
+  const fr = (data || []).filter(r => window.CLOUD_PEOPLE[r.user_id]).map(r => {
+    const p = window.CLOUD_PEOPLE[r.user_id], at = Date.parse(r.updated_at) || now;
+    return Object.assign({}, p, { lat: r.lat, lng: r.lng, trackId: presenceTrack(r), live: now - at < 5 * 60000, ago: ago(at), place: '', cloudFriend: true });
+  });
+  FRIENDS = FRIENDS.filter(f => !f.cloudFriend).concat(fr);
+  if (U.tab === 'map' && !hasScreen()) { if (typeof syncMarkers === 'function') syncMarkers(); const d = $('.dock'); if (d) renderView(); }
+}
+function mapTick() { pushPresence().then(pullPresence).catch(() => {}); }
+function startMapSync() { clearTimeout(MAPC.timer); mapTick(); const loop = () => { MAPC.timer = setTimeout(() => { if (!document.hidden) mapTick(); loop(); }, U.tab === 'map' ? 20000 : 60000); }; loop(); }
+
 function bootCloud() {
   if (!SB) return;
   window.CLOUD_COMMS = null; window.CLOUD_TRACKS = [];
@@ -368,6 +410,17 @@ function bootCloud() {
   A.search = () => { baseSearch(); loadPeople(); };
   const baseIn = IN.search;
   IN.search = el => { baseIn(el); searchPeople(el.value); };
+
+  // Map en ligne
+  const baseGhost = A.ghost;
+  A.ghost = el => { baseGhost(el); pushPresence(true); };
+  const baseTab2 = A.tab;
+  A.tab = el => { baseTab2(el); if (el.dataset.id === 'map') mapTick(); };
+  const baseLocate = A.locate;
+  if (baseLocate) A.locate = el => { baseLocate(el); setTimeout(() => pushPresence(true), 4000); };
+  const baseLogout = A.authLogout;
+  if (baseLogout) A.authLogout = el => { if (MAPC.sent && uidMe()) SB.from('presence').delete().eq('user_id', uidMe()).then(() => { MAPC.sent = false; MAPC.last = ''; }); baseLogout(el); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && uidMe()) mapTick(); });
 }
 // appelé une fois le compte connecté
-function cloudSignedIn() { if (!SB) return; window.CLOUD_PEOPLE = {}; Object.keys(FOL).forEach(k => delete FOL[k]); peopleQ = ''; loadComms(true); loadTracks(true); loadPeople(); if (typeof adminSignedIn === 'function') adminSignedIn(); }
+function cloudSignedIn() { if (!SB) return; window.CLOUD_PEOPLE = {}; Object.keys(FOL).forEach(k => delete FOL[k]); peopleQ = ''; loadComms(true); loadTracks(true); loadPeople(); startMapSync(); if (typeof adminSignedIn === 'function') adminSignedIn(); }
