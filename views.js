@@ -3,7 +3,7 @@
 
 // ---------- FEED ----------
 function feedPosts() {
-  let list = S.posts.filter(p => !blocked(p.author) && !S.hiddenPosts.includes(p.id));
+  let list = allPosts().filter(p => !blocked(p.author) && !S.hiddenPosts.includes(p.id));
   if (U.feedMode === 'following') list = list.filter(p => p.author === 'me' || S.followed.includes(p.author));
   else if (S.consents.reco && S.prefs.genres.length) {
     const score = p => p.author === 'me' && Date.now() - (p.at || 0) < 3600000 ? -1 : (S.prefs.genres.includes(T(p.trackId).genre) ? 0 : 1);
@@ -344,7 +344,7 @@ function statsHTML(id, followers, following, locked, cls) {
   return `<div class="${cls || 'stats'}"><button data-a="followList" data-id="${id}" data-k="followers"><b>${fmtN(followers)}</b><small>Abonnés</small></button><button data-a="followList" data-id="${id}" data-k="following"><b>${fmtN(following)}</b><small>Abonnements</small></button><button data-a="statLikes" data-id="${id}"><b>${d(t.likes)}</b><small>J’aime</small></button><button data-a="statViews" data-id="${id}"><b>${d(t.views)}</b><small>Vues</small></button></div>`;
 }
 VIEWS.account = () => {
-  const me = user('me'), mine = S.posts.filter(p => p.author === 'me'), t = T(P.trackId);
+  const me = user('me'), mine = allPosts().filter(p => p.author === 'me'), t = T(P.trackId);
   const unread = S.activity.some(a => !a.read);
   let tabBody = '';
   if (U.accTab === 'posts') tabBody = mine.length ? gridPosts(mine) : `<div class="empty">${ic('video', 36)}<span>Tu n’as encore rien publié.</span><button class="btn primary" data-a="create">${ic('plus', 18)}Créer une publication</button></div>`;

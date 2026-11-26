@@ -345,6 +345,84 @@ async function pullPresence() {
 function mapTick() { pushPresence().then(pullPresence).catch(() => {}); }
 function startMapSync() { clearTimeout(MAPC.timer); mapTick(); const loop = () => { MAPC.timer = setTimeout(() => { if (!document.hidden) mapTick(); loop(); }, U.tab === 'map' ? 20000 : 60000); }; loop(); }
 
+// ---------- publications du feed en ligne ----------
+window.CLOUD_POSTS = [];
+const POSTC = { at: 0 };
+const okColor = c => /^#[0-9A-Fa-f]{6}$/.test(c || '') ? c : null;
+function postTrack(r) {
+  const t = r.track_id && T(r.track_id);
+  if (t && !t.synthetic) return t.id;
+  const id = 'pt-' + r.id;
+  window.PRESENCE_TRACKS[id] = { id, title: r.track_title || 'Son', artist: r.track_artist || '', genre: 'Musique', color: r.track_color || '#9B85FF', shape: 'disc', dur: 180, bpm: 100, synthetic: true, quiet: true };
+  return id;
+}
+function toPost(r) {
+  const me = uidMe();
+  if (r.author) addPeople([r.author]);
+  return {
+    id: r.id, cloudId: r.id, cloud: true, author: r.author_id === me ? 'me' : r.author_id,
+    trackId: postTrack(r), start: r.start_sec || 0, len: r.len_sec || 30, style: r.style || 'waves', filter: r.filter || 'normal',
+    texts: Array.isArray(r.texts) ? r.texts : [], caption: r.caption || '',
+    video: r.video_path ? pubUrl('posts', r.video_path) : null,
+    photos: r.photo_paths && r.photo_paths.length ? r.photo_paths.map(x => pubUrl('posts', x)) : null,
+    likes: 0, views: 0, commentsBase: 0, shares: 0, comments: [], allowComments: r.allow_comments !== false, vis: r.vis, at: Date.parse(r.created_at) || Date.now(),
+    videoPath: r.video_path, photoPaths: r.photo_paths || [],
+  };
+}
+async function loadFeedPosts(force) {
+  if (!SB || !uidMe()) return;
+  if (!force && Date.now() - POSTC.at < 20000) return;
+  POSTC.at = Date.now();
+  const { data, error } = await SB.from('posts').select('*,author:profiles(' + PEOPLE_COLS + ')').order('created_at', { ascending: false }).limit(200);
+  if (error) { POSTC.at = 0; return; }
+  const local = new Set(S.posts.map(p => p.cloudId).filter(Boolean));
+  window.CLOUD_POSTS = (data || []).filter(r => !local.has(r.id)).map(toPost);
+  if (!hasScreen() && (U.tab === 'feed' || U.tab === 'account') && !U.activePost) renderView();
+  ['profile', 'tag'].forEach(refreshOv);
+}
+const dataToBlob = d => fetch(d).then(r => r.blob());
+const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+async function uploadPost(p, file) {
+  const me = uidMe(), id = (crypto.randomUUID ? crypto.randomUUID() : null); if (!me || !id) return;
+  toast('Envoi de ta publication…', ic('upload', 20));
+  try {
+    let video_path = null, photo_paths = [];
+    if (file) {
+      const ext = ((file.name || '').split('.').pop() || 'mp4').toLowerCase(), type = file.type || VIDEO_TYPES[ext] || 'video/mp4';
+      if (file.size > 50 * 1048576) throw new Error('Vidéo trop lourde : 50 Mo maximum pour la mettre en ligne.');
+      video_path = `${me}/${id}/video.${VIDEO_TYPES[ext] ? ext : 'mp4'}`;
+      const up = await SB.storage.from('posts').upload(video_path, file, { contentType: type, upsert: false });
+      if (up.error) throw up.error;
+    }
+    for (let i = 0; i < (p.photos || []).length; i++) {
+      const src = p.photos[i]; if (/^https?:/.test(src)) continue;
+      const b = await dataToBlob(src), path = `${me}/${id}/${i}.jpg`;
+      const up = await SB.storage.from('posts').upload(path, b, { contentType: b.type || 'image/jpeg', upsert: false });
+      if (up.error) throw up.error;
+      photo_paths.push(path);
+    }
+    const t = T(p.trackId), shareable = t && !t.synthetic && (!t.mine || t.cloud) ? t.id : null;
+    const row = { id, track_id: shareable, track_title: t ? String(t.title).slice(0, 80) : null, track_artist: t ? String(t.artist || '').slice(0, 60) : null, track_color: t ? okColor(t.color) : null,
+      start_sec: Math.round(p.start || 0), len_sec: Math.round(p.len || 30), style: p.style || 'waves', filter: p.filter || 'normal', texts: p.texts || [], caption: (p.caption || '').slice(0, 2200),
+      video_path, photo_paths, allow_comments: p.allowComments !== false, vis: p.vis === 'Amis' ? 'Amis' : 'Public' };
+    const { error } = await SB.from('posts').insert(row);
+    if (error) throw error;
+    p.cloudId = id; p.videoPath = video_path; p.photoPaths = photo_paths;
+    if (video_path) p.video = pubUrl('posts', video_path);
+    if (photo_paths.length) p.photos = photo_paths.map(x => pubUrl('posts', x));
+    save(); toast('Publication en ligne : tes abonnés peuvent la voir', ic('check', 20));
+  } catch (e) {
+    toast((e && e.message && /Mo maximum/.test(e.message)) ? e.message : 'Publication gardée sur cet appareil : l’envoi en ligne a échoué (' + cloudErr(e) + ')', ic('info', 20));
+  }
+}
+async function deleteCloudPost(p) {
+  if (!p || !p.cloudId || !SB) return;
+  await SB.from('posts').delete().eq('id', p.cloudId);
+  const files = [p.videoPath].concat(p.photoPaths || []).filter(Boolean);
+  if (files.length) SB.storage.from('posts').remove(files).catch(() => {});
+  window.CLOUD_POSTS = window.CLOUD_POSTS.filter(x => x.cloudId !== p.cloudId);
+}
+
 function bootCloud() {
   if (!SB) return;
   window.CLOUD_COMMS = null; window.CLOUD_TRACKS = [];
@@ -411,6 +489,29 @@ function bootCloud() {
   const baseIn = IN.search;
   IN.search = el => { baseIn(el); searchPeople(el.value); };
 
+
+  // publications en ligne
+  const basePublish = A.publish;
+  A.publish = el => {
+    const c = U.create; if (!c) return;
+    const file = c.src === 'video' ? c.videoFile : null, before = S.posts[0];
+    basePublish(el);
+    const p = S.posts[0];
+    if (p && p !== before && p.vis !== 'Moi seulement' && uidMe()) uploadPost(p, file);
+  };
+  const baseDelete = A.deletePost;
+  A.deletePost = el => {
+    const p = post(el.dataset.id);
+    baseDelete(el);
+    const fn = U.dialogFn;
+    if (p && p.cloudId) U.dialogFn = async () => { await deleteCloudPost(p); S.posts = S.posts.filter(x => x.id !== p.id); fn(); };
+  };
+  const baseTab3 = A.tab;
+  A.tab = el => { baseTab3(el); if (el.dataset.id === 'feed' || el.dataset.id === 'account') loadFeedPosts(); };
+  const baseFeedMode2 = A.feedMode;
+  A.feedMode = el => { baseFeedMode2(el); loadFeedPosts(); };
+  const baseOpenProfile2 = A.openProfile;
+  A.openProfile = el => { baseOpenProfile2(el); loadFeedPosts(); };
   // Map en ligne
   const baseGhost = A.ghost;
   A.ghost = el => { baseGhost(el); pushPresence(true); };
@@ -423,4 +524,4 @@ function bootCloud() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden && uidMe()) mapTick(); });
 }
 // appelé une fois le compte connecté
-function cloudSignedIn() { if (!SB) return; window.CLOUD_PEOPLE = {}; Object.keys(FOL).forEach(k => delete FOL[k]); peopleQ = ''; loadComms(true); loadTracks(true); loadPeople(); startMapSync(); if (typeof adminSignedIn === 'function') adminSignedIn(); }
+function cloudSignedIn() { if (!SB) return; window.CLOUD_PEOPLE = {}; window.CLOUD_POSTS = []; Object.keys(FOL).forEach(k => delete FOL[k]); peopleQ = ''; loadComms(true); loadTracks(true); loadPeople(); loadFeedPosts(true); startMapSync(); if (typeof adminSignedIn === 'function') adminSignedIn(); }

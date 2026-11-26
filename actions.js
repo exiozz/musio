@@ -696,6 +696,7 @@ document.addEventListener('pointerleave', untilt); window.addEventListener('blur
 (S.myTracks || []).forEach(t => IDB.get(t.id).then(b => { if (b) AUDIO_SRC[t.id] = URL.createObjectURL(b); }).catch(() => {}));
 if (P.trackId && T(P.trackId)) E.load(T(P.trackId), 0); else P.trackId = null;
 if (isDesk() && S.settings.device === 'Ce téléphone') S.settings.device = 'Cet ordinateur';
+if (!VIEWS[U.tab]) U.tab = 'feed';
 applyTheme(); renderAll(); requestAnimationFrame(tick);
 if (typeof bootAccounts === 'function') bootAccounts(); else if (!S.onboarded) startOnboarding();
 window.__echo = { get S() { return S; }, U, P, A, renderAll, push, pop };

@@ -146,13 +146,13 @@ let S = loadState();
 let FRIENDS = clone(D.friends);
 const P = Object.assign({ trackId: null, queue: [], qi: 0, shuffle: false, repeat: 'off', lyrics: false, source: '', post: null }, S.player || {});
 P.post = null;
-const U = { tab: 'feed', feedMode: 'foryou', mapMode: 'live', mapPanel: false, chatMode: 'msgs', chatQ: '', matchMode: 'discover', accTab: 'posts', genre: 'Tout', ov: [], typing: {}, search: { q: '', tab: 'Tout' }, unlocked: false, activePost: null, mapT: null, lastLyric: -1 };
+const U = { tab: (() => { try { return sessionStorage.getItem('musio-tab') || 'feed'; } catch (e) { return 'feed'; } })(), feedMode: 'foryou', mapMode: 'live', mapPanel: false, chatMode: 'msgs', chatQ: '', matchMode: 'discover', accTab: 'posts', genre: 'Tout', ov: [], typing: {}, search: { q: '', tab: 'Tout' }, unlocked: false, activePost: null, mapT: null, lastLyric: -1 };
 let saveT, warnedQuota = false;
 function save() {
   clearTimeout(saveT);
   saveT = setTimeout(() => {
     const pack = strip => JSON.stringify(Object.assign({}, S, {
-      posts: S.posts.map(p => { const q = Object.assign({}, p); if (q.video) { q.video = null; } if (strip && q.photos) { q.photos = null; } return q; }),
+      posts: S.posts.map(p => { const q = Object.assign({}, p); if (q.video && !/^https?:/.test(q.video)) { q.video = null; } if (strip && q.photos && !q.photos.every(x => /^https?:/.test(x))) { q.photos = null; } return q; }),
       trackArt: strip === 2 ? {} : S.trackArt,
       me: strip === 2 ? Object.assign({}, S.me, { banner: null }) : S.me,
       echoes: strip ? S.echoes.map(e => Object.assign({}, e, { img: null })) : S.echoes,
@@ -177,7 +177,7 @@ const IDB = (() => {
 })();
 const blocked = id => S.blocked.includes(id);
 function totals(id) {
-  const mine = S.posts.filter(p => p.author === id);
+  const mine = allPosts().filter(p => p.author === id);
   let likes = mine.reduce((a, p) => a + p.likes + (S.likedPosts.includes(p.id) ? 1 : 0), 0), views = mine.reduce((a, p) => a + postViews(p), 0);
   return { likes, views };
 }
@@ -194,7 +194,8 @@ const conv = id => S.convs.find(c => c.id === id);
 // communautés : en ligne (window.CLOUD_COMMS) quand les comptes sont actifs, sinon sur l'appareil
 const allComms = () => window.CLOUD_COMMS || S.communities;
 const comm = id => allComms().find(k => k.id === id);
-const post = id => S.posts.find(p => p.id === id);
+const allPosts = () => window.CLOUD_POSTS && window.CLOUD_POSTS.length ? S.posts.concat(window.CLOUD_POSTS) : S.posts;
+const post = id => allPosts().find(p => p.id === id);
 
 // ---------- fragments ----------
 const initial = n => esc(String(n || '?').trim().charAt(0).toUpperCase());
@@ -286,7 +287,7 @@ function unlock() {
 }
 function playTrack(id, o = {}) {
   const t = T(id); if (!t) return;
-  if (t.synthetic) { toast(t.title === 'Rien en écoute' ? 'Rien en écoute pour l’instant' : `« ${t.title} » n’est pas sur Musio : impossible de l’écouter ici`, ic('info', 20)); return; }
+  if (t.synthetic) { if (t.quiet) return; toast(t.title === 'Rien en écoute' ? 'Rien en écoute pour l’instant' : `« ${t.title} » n’est pas sur Musio : impossible de l’écouter ici`, ic('info', 20)); return; }
   if (!U.unlocked) unlock();
   if (o.queue) { P.queue = o.queue.slice(); P.qi = Math.max(0, P.queue.indexOf(id)); }
   else if (!P.queue.includes(id)) { P.queue = [id]; P.qi = 0; } else P.qi = P.queue.indexOf(id);
@@ -331,6 +332,7 @@ function refreshPlaying(changed) {
 const VIEWS = {}, AFTER = {}, OV = {}, A = {}, FORMS = {}, IN = {}, CH = {};
 function renderAll() { renderView(); renderChrome(); renderOverlays(); }
 function renderView() {
+  try { sessionStorage.setItem('musio-tab', U.tab); } catch (e) {}
   const v = $('#view'); const key = U.tab + ':' + U.feedMode + ':' + U.chatMode + ':' + U.matchMode + ':' + U.accTab;
   const sc = $('.scroll', v); const prevTop = v.dataset.key === key && sc ? sc.scrollTop : 0;
   v.innerHTML = VIEWS[U.tab]();
