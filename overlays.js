@@ -174,7 +174,7 @@ OV.search = {
     <div class="scroll"><div class="chips">${['Tout', 'Sons', 'Personnes', 'Tags'].map(x => `<button class="chip glass ${U.search.tab === x ? 'on' : ''}" data-a="searchTab" data-id="${x}" aria-pressed="${U.search.tab === x}">${x}</button>`).join('')}</div><div id="results" style="display:flex;flex-direction:column;gap:14px">${searchResults()}</div></div>`,
   after: (o, el, fresh) => { if (fresh) setTimeout(() => { const i = $('#searchIn'); if (i) i.focus(); }, 380); },
 };
-function allTags() { const m = {}; S.posts.forEach(p => (p.caption.match(/#([\wÀ-ÿ-]+)/g) || []).forEach(t => { const k = t.slice(1).toLowerCase(); m[k] = (m[k] || 0) + 1; })); return Object.entries(m).sort((a, b) => b[1] - a[1]); }
+function allTags() { const m = {}; allPosts().forEach(p => (p.caption.match(/#([\wÀ-ÿ-]+)/g) || []).forEach(t => { const k = t.slice(1).toLowerCase(); m[k] = (m[k] || 0) + 1; })); return Object.entries(m).sort((a, b) => b[1] - a[1]); }
 function personRow(u) { const fol = S.followed.includes(u.id); return `<div class="li"><button class="grow row" data-a="openProfile" data-id="${u.id}">${avatar(u, 44)}<span class="tt"><b style="display:flex;align-items:center">${esc(u.name)}${verified(u)}</b><small>@${esc(u.handle)}</small></span></button><button class="btn ${fol ? 'glass' : 'primary'}" style="height:36px;padding:0 14px" data-a="follow" data-id="${u.id}" aria-pressed="${fol}">${fol ? 'Abonné·e' : 'Suivre'}</button></div>`; }
 function searchResults() {
   const q = U.search.q.trim().toLowerCase().replace(/^[@#]/, ''), tab = U.search.tab;
@@ -193,7 +193,7 @@ function searchResults() {
   if ((tab === 'Tout' || tab === 'Tags') && tags.length) h += `<p class="result-h">Tags</p><div class="panel glass"><div class="list">${tags.map(([t, n]) => `<button class="li" data-a="tag" data-id="${esc(t)}"><span class="icon-btn glass sm" style="font-weight:800">#</span><span class="grow tt"><b>#${esc(t)}</b><small>${n} publication${n > 1 ? 's' : ''}</small></span>${ic('chevron', 18)}</button>`).join('')}</div></div>`;
   return h || `<div class="empty">${ic('search', 36)}<span>Aucun résultat pour « ${esc(U.search.q)} ».</span></div>`;
 }
-OV.tag = { kind: 'screen', label: 'Tag', html: o => { const list = S.posts.filter(p => !blocked(p.author) && p.caption.toLowerCase().includes('#' + o.tag.toLowerCase())); return head('#' + esc(o.tag)) + `<div class="scroll"><p class="t2">${list.length} publication${list.length > 1 ? 's' : ''}</p>${gridPosts(list)}</div>`; } };
+OV.tag = { kind: 'screen', label: 'Tag', html: o => { const list = allPosts().filter(p => !blocked(p.author) && p.caption.toLowerCase().includes('#' + o.tag.toLowerCase())); return head('#' + esc(o.tag)) + `<div class="scroll"><p class="t2">${list.length} publication${list.length > 1 ? 's' : ''}</p>${gridPosts(list)}</div>`; } };
 OV.postView = {
   kind: 'screen', label: 'Publication', cls: 'postview',
   html: o => { const p = post(o.id); if (!p) return head('Publication') + '<div class="empty">Publication introuvable.</div>'; return `<div class="feed" style="overflow:hidden">${postHTML(p)}</div><div class="feed-top"><button class="icon-btn glass strong" data-a="back" aria-label="Retour">${ic('back')}</button></div>`; },
@@ -240,7 +240,7 @@ OV.profile = {
     const u = user(o.id), fr = FRIENDS.find(f => f.id === o.id), prof = D.profiles.find(p => p.id === o.id);
     const isB = blocked(o.id);
     const fol = S.followed.includes(o.id), req = S.requested.includes(o.id), locked = !!(prof && prof.private) && !fol;
-    const posts = isB || locked ? [] : S.posts.filter(p => p.author === o.id);
+    const posts = isB || locked ? [] : allPosts().filter(p => p.author === o.id);
     const t = fr ? T(fr.trackId) : prof ? T(prof.anthem) : null;
     const at = u.artist ? D.tracks.filter(x => x.artist.indexOf(u.artist) === 0) : [];
     const fd = followData(o.id), followers = fd.followersTotal, following = fd.followingTotal;
@@ -420,7 +420,7 @@ OV.profileViews = {
 OV.stat = {
   kind: 'sheet', label: 'Statistiques',
   html: o => {
-    const u = user(o.id), t = totals(o.id), mine = o.id === 'me', posts = S.posts.filter(p => p.author === o.id);
+    const u = user(o.id), t = totals(o.id), mine = o.id === 'me', posts = allPosts().filter(p => p.author === o.id);
     const isL = o.k === 'likes';
     return `<div style="display:flex;flex-direction:column;gap:14px;text-align:center;align-items:center">
       <span class="pv-ic big">${isL ? icf('heart', 30) : icf('play', 28)}</span>

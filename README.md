@@ -49,6 +49,7 @@ Le schéma de la base est dans `supabase/migrations/` (comptes, communautés, so
 - `tracks` + buckets `sounds` / `covers` : chacun dépose ses fichiers dans son dossier, 20 Mo et 100 sons max par compte, droits certifiés
 - `reports`, `boosts`, `admin_stats`, `admin_ban` (005) : signalements en ligne, mise en avant pendant une durée, suspension de comptes
 - `follows` (006) : abonnements en ligne (qui suit qui), visibles par les membres connectés
+- `posts` + bucket `posts` (009) : publications du feed (photos, vidéos 50 Mo max) visibles par tous (Public) ou par les personnes que l’auteur suit (Amis) ; « Moi seulement » reste sur l’appareil
 - `presence` (008) : position arrondie (~100 m) et son en cours pour la Map, visible uniquement par les personnes que tu suis ; le mode fantôme la retire
 
 Vide `config.js` pour faire tourner Musio sans comptes en ligne (mode local).
